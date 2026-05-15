@@ -12,27 +12,22 @@ import {
   AlertCircle, 
   Copy,
   Video,
-  Info,
-  Lock,
-  Key
+  Info
 } from 'lucide-react';
 
 // --- API Configuration ---
-// Models: Using the requested Gemini 3.1 Pro strings
+const apiKey = "AIzaSyBsG8HDaXR1OFCW1UrPio8jts7op3WhtrU"; 
 const TEXT_MODEL = "gemini-3.1-pro-preview"; 
 const IMAGE_MODEL = "gemini-3.1-pro-preview"; 
 
 const App = () => {
-  // Security States
-  const [apiKey, setApiKey] = useState("");
-  const [hasKey, setHasKey] = useState(false);
-  const [step, setStep] = useState(0); // Start at 0 for API Setup
+  const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   
   // Input States
   const [videoTitle, setVideoTitle] = useState("");
   const [sourceVideoTitle, setSourceVideoTitle] = useState("");
-  const [sourceDescription, setSourceDescription] = useState(""); 
+  const [sourceDescription, setSourceDescription] = useState(""); // New Field
   const [additionalDetails, setAdditionalDetails] = useState("");
   const [transcript, setTranscript] = useState(`Part one, the kitchen table. You grow up in a house where money is not discussed because there is nothing to discuss. This is Gary, Indiana, 2001. Your father drives a forklift at a steel distribution center, days only because the night shift pays more and he bid for it three times and lost three times to men with more seniority and less reason to care. Your mother works the front desk at a dental office she will never be able to afford as a patient. She brings home the sample toothbrushes.
 
@@ -106,9 +101,8 @@ The door is about to open. It always does.`);
 
   // --- API Utilities ---
   const callGemini = async (prompt, systemInstruction = "", useSearch = false, imageData = null) => {
-    // Check key from state instead of hardcoded constant
     if (!apiKey || apiKey.trim() === "") {
-        throw new Error("API Key is missing. Please enter it in the setup screen.");
+        throw new Error("API Key is missing. Please paste your key into line 16.");
     }
 
     let retries = 0;
@@ -165,31 +159,13 @@ The door is about to open. It always does.`);
     }
   };
 
-  // --- Security Logic ---
-  const handleApiKeySubmit = (e) => {
-    e.preventDefault();
-    if (apiKey.trim().startsWith("AIza")) {
-      setHasKey(true);
-      setStep(1); // Proceed to Ingestion Page
-    } else {
-      alert("Please enter a valid Gemini API Key (starts with AIza)");
-    }
-  };
-
-  const handleResetKey = () => {
-    setApiKey("");
-    setHasKey(false);
-    setStep(0);
-  };
-
   // --- Workflow Logic ---
+
   const analyzeAndGenerate = async () => {
     setLoading(true);
     try {
       const systemPrompt = `You are a professional YouTube strategist and scriptwriter. 
-      TASK 1: Write a production script for a video titled "${videoTitle}" matching the provided transcript's style and tone. Ensure it is structured for high retention and targeted for an 8-minute video.
-      CRITICAL FOR TASK 1: The script must be PLAIN SPOKEN TEXT ONLY. Do not include any production cues, stage directions, speaker names, or bracketed instructions (e.g., [Music], [Scene transition], [Camera zooms]). The output must be ready to be pasted directly into a text-to-speech generator.
-      
+      TASK 1: Write a production script for a video titled "${videoTitle}" matching the provided transcript's style and tone. Ensure it is structured for high retention.
       TASK 2: Write a compelling YouTube Video Description for this video by analyzing the "Source Description" provided. 
       DESCRIPTION REQUIREMENTS:
       - Match the tone and formatting style of the Source Description.
@@ -200,7 +176,7 @@ The door is about to open. It always does.`);
       
       Format your response with the following markers:
       ---SCRIPT---
-      [Spoken content here]
+      [Script content here]
       ---DESCRIPTION---
       [Description content here]`;
       
@@ -302,46 +278,13 @@ The door is about to open. It always does.`);
           <div className="bg-indigo-600 p-2 rounded-xl text-white"><Clapperboard size={28} /></div>
           <h1 className="text-2xl font-black tracking-tight uppercase italic">DozeZen<span className="text-indigo-600">Workflow</span></h1>
         </div>
-        {hasKey && (
-          <button onClick={handleResetKey} className="text-[10px] bg-white border border-slate-200 hover:bg-slate-50 px-3 py-1.5 rounded-full font-bold uppercase tracking-widest transition-colors flex items-center gap-2 shadow-sm text-slate-500">
-            <Lock size={12} /> Reset Credentials
-          </button>
-        )}
+        <div className="text-xs text-slate-400 font-bold uppercase tracking-widest text-right">
+          Intelligence Engine v3.1<br/>
+          <span className="text-[10px] text-slate-300">Script & Description Sync</span>
+        </div>
       </header>
 
       <main className="max-w-6xl mx-auto bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden min-h-[600px]">
-        
-        {/* Step 0: Secure Setup Screen */}
-        {step === 0 && (
-          <div className="p-16 max-w-xl mx-auto text-center flex flex-col items-center justify-center h-full min-h-[500px]">
-            <div className="w-20 h-20 bg-indigo-50 text-indigo-600 rounded-3xl flex items-center justify-center mb-8 ring-8 ring-indigo-50/50">
-              <Key size={40} />
-            </div>
-            <h2 className="text-3xl font-black mb-4 tracking-tight">Security Gateway</h2>
-            <p className="text-slate-500 mb-10 leading-relaxed">To ensure your production account remains secure on GitHub, please enter your Gemini API key below. This key is used strictly for your current browser session and is never saved to the cloud.</p>
-            
-            <form onSubmit={handleApiKeySubmit} className="w-full space-y-4">
-              <div className="relative">
-                <input 
-                  type="password" 
-                  placeholder="Paste Gemini API Key (AIza...)" 
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  className="w-full p-5 rounded-2xl border-2 border-slate-100 focus:border-indigo-600 focus:ring-0 outline-none transition-all text-center font-mono text-lg shadow-sm"
-                />
-              </div>
-              <button type="submit" className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black text-lg hover:bg-indigo-700 transition-all active:scale-[0.99] shadow-lg shadow-indigo-200 flex items-center justify-center gap-3">
-                Unlock Studio <ArrowLeft className="rotate-180" size={20} />
-              </button>
-            </form>
-            
-            <p className="mt-8 text-[10px] text-slate-400 font-black uppercase tracking-widest flex items-center gap-2">
-              <AlertCircle size={12} /> Encryption Standard: Session Memory Only
-            </p>
-          </div>
-        )}
-
-        {/* Step 1: Ingestion Page */}
         {step === 1 && (
           <div className="p-8">
             <h2 className="text-2xl font-bold mb-8">1. Source Content Ingestion</h2>
@@ -350,7 +293,7 @@ The door is about to open. It always does.`);
               {/* Target Details */}
               <div className="space-y-4">
                 <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100">
-                  <h3 className="font-bold text-slate-900 mb-3 text-sm uppercase tracking-wider text-indigo-600">New Video Target</h3>
+                  <h3 className="font-bold text-slate-900 mb-3 text-sm uppercase tracking-wider">New Video Target</h3>
                   <label className="block text-[10px] font-black text-slate-400 mb-1 uppercase">Video Title</label>
                   <input type="text" value={videoTitle} onChange={(e) => setVideoTitle(e.target.value)} className="w-full bg-white p-3 rounded-xl border border-slate-200 shadow-sm outline-none mb-4" />
                   
@@ -376,6 +319,10 @@ The door is about to open. It always does.`);
                     placeholder="Paste the YouTube video description here to mimic style, sources, and keywords..." 
                     className="w-full bg-white p-3 rounded-xl border border-slate-200 outline-none h-48 resize-none text-sm leading-relaxed" 
                   />
+                  <div className="mt-3 flex items-start gap-2">
+                    <Info size={14} className="text-indigo-400 shrink-0 mt-0.5" />
+                    <p className="text-[10px] text-indigo-400 leading-tight italic">The AI will mirror this formatting, strictly placing sources before hashtags.</p>
+                  </div>
                 </div>
               </div>
 
@@ -443,7 +390,7 @@ The door is about to open. It always does.`);
             <div className="grid lg:grid-cols-2 gap-8">
               <div>
                 <div className="flex items-center gap-2 mb-2 text-slate-400 uppercase font-black text-[10px] tracking-widest">
-                  <FileText size={14} /> Production Script (Narration Only)
+                  <FileText size={14} /> Production Script
                 </div>
                 <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100 whitespace-pre-wrap h-[500px] overflow-y-auto leading-relaxed font-serif text-lg">
                   {generatedScript}
@@ -455,7 +402,7 @@ The door is about to open. It always does.`);
                   <Video size={14} /> Optimized Video Description
                 </div>
                 <div className="bg-indigo-50/30 p-8 rounded-3xl border border-indigo-100 whitespace-pre-wrap h-[500px] overflow-y-auto leading-relaxed font-sans text-sm text-slate-700 shadow-inner">
-                  {generatedVideoDescription || "Description metadata processing failed, please check source input."}
+                  {generatedVideoDescription || "Analysis complete. Script generated above. Description metadata processing failed, please check source input."}
                 </div>
               </div>
             </div>

@@ -10,29 +10,19 @@ import {
   ArrowLeft, 
   Trash2, 
   AlertCircle, 
-  Copy,
-  Video,
-  Info,
-  Lock,
-  Key
+  Copy 
 } from 'lucide-react';
 
 // --- API Configuration ---
-// Models: Using the requested Gemini 3.1 Pro strings
+const apiKey = "AIzaSyBsG8HDaXR1OFCW1UrPio8jts7op3WhtrU"; 
 const TEXT_MODEL = "gemini-3.1-pro-preview"; 
 const IMAGE_MODEL = "gemini-3.1-pro-preview"; 
 
 const App = () => {
-  // Security States
-  const [apiKey, setApiKey] = useState("");
-  const [hasKey, setHasKey] = useState(false);
-  const [step, setStep] = useState(0); // Start at 0 for API Setup
+  const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
-  
-  // Input States
   const [videoTitle, setVideoTitle] = useState("");
   const [sourceVideoTitle, setSourceVideoTitle] = useState("");
-  const [sourceDescription, setSourceDescription] = useState(""); 
   const [additionalDetails, setAdditionalDetails] = useState("");
   const [transcript, setTranscript] = useState(`Part one, the kitchen table. You grow up in a house where money is not discussed because there is nothing to discuss. This is Gary, Indiana, 2001. Your father drives a forklift at a steel distribution center, days only because the night shift pays more and he bid for it three times and lost three times to men with more seniority and less reason to care. Your mother works the front desk at a dental office she will never be able to afford as a patient. She brings home the sample toothbrushes.
 
@@ -48,7 +38,7 @@ build one of your own. Part two, the mentor. His name is Calvin Marsh. He is 31 
 
 everything in your house combined and you say, "What part of the speech was true?" He stops. He looks at you the way people look at something that moved when it wasn't supposed to. "Which part did you think wasn't?" "The part about passion. Nobody builds something real on passion. Passion is what you say when you don't want to explain the actual reason." He is quiet for a moment. Then he says, "You got a phone?" He sends you a Dropbox link, a folder of
 
-market analysis documents, raw data, no narrative. The kind of thing someone dumps before a pitch meeting to see if the other person does their homework. "If you can tell me what's missing from these by Sunday, text me." You find four gaps by Saturday morning. You text him all four. He calls you back in 11 minutes. For 18 months, you are his unpaid research assistant, which is probably exploitation and almost certainly the best education available to someone who
+market analysis documents, raw data, no narrative. The kind of thing someone dumps before a pitch meeting to see if the other person does their homework. "If you can tell me what's missing from these by Sunday, [music] text me." You find four gaps by Saturday morning. You text him all four. He calls you back in 11 minutes. For 18 months, you are his unpaid research assistant, which is probably exploitation and almost certainly the best education available to someone who
 
 can't afford the alternative. You work weekends. You build models nobody asked for. You learn that the people who do work nobody asked for are the ones who eventually get asked for everything. Calvin's office is a converted floor of a building in Indianapolis that smells like old carpet and ambition in proportions that keep changing. Six people, mismatched chairs, a whiteboard that has never once been fully erased. You take a bus two hours each way. You bring food from home because you've
 
@@ -82,7 +72,7 @@ the polite way that power makes things clear, that a founder running a nearly $3
 
 rebranded into the language of culture without any of the content. What you lose is not the control. You expected to lose the control. What you lose is the specific feeling of watching something become what it was supposed to be. The iteration. The problem that finally gives, the late-night moment when a thing that didn't work yesterday works today, and the only people who know are the four of you in the room. That process, that was the only part that ever felt real. Now it belongs to someone else.
 
-And you have to sit in glass-walled offices and say nothing because you signed the paperwork. You were never the company. You were the origin story. Origin stories are useful for press releases. They don't run the quarterly business review. You resign on a Wednesday, mutual language, stock fully vested, number unchanged. This is the collapse, not poverty, not failure, just irrelevance. The specific modern violence of becoming optional inside
+And you have to sit in glass-walled offices and say nothing because you signed the paperwork. You were never the company. You were the origin story. origin stories are useful for press releases. They don't run the quarterly business review. You resign on a Wednesday, mutual language, stock fully vested, number unchanged. This is the collapse, not poverty, not failure, just irrelevance. The specific modern violence of becoming optional inside
 
 something you built. Part six, the engine. You try stopping. Three months. House in Nashville, money you will never need to touch, mornings with no meetings. You take walks. You read books you've been meaning to read for five years. You have dinner with people who have nothing to do with anything you've built. It is the most uncomfortable you have ever been because the hunger doesn't know what to do with comfort. It was built on the kitchen table in Gary, on the sorted envelopes, on your
 
@@ -95,20 +85,18 @@ choose to work. You have given him everything he didn't have. The house, the ret
 sufficiency. The ability to sit at a table and feel like the table is enough. The thing that made you valuable, the relentlessness, the refusal to be satisfied, the hunger that outlasted the poverty that built it, is the same thing that makes every arrival feel like nothing. The wound doesn't close when the money comes. The wound is the engine. Close it and you stop. You are 28 and you already know you will not stop it. You just wanted it to know, once, that you knew. Somewhere in Gary right now, a 16-year-old is sitting in a school assembly. Most of the room is asleep. Someone in an expensive car is explaining success in the version that makes the room feel safe. The kid is taking notes. He doesn't know yet what he's really writing down. He thinks he's learning how to get out. He doesn't know yet that getting out and getting free are different destinations and that the distance between them is the part nobody puts in the speech. After the assembly, his legs will carry him somewhere before he decides to go.
 
 The door is about to open. It always does.`);
-  
-  // Generated Content States
   const [generatedScript, setGeneratedScript] = useState("");
-  const [generatedVideoDescription, setGeneratedVideoDescription] = useState("");
   const [characterRef, setCharacterRef] = useState("Young adult male, wearing outfit that is appropriate for the setting and time period, no hair, neutral expression, slightly slimmer build, calm personality, recognizable protagonist design.");
   const [characterImageBase64, setCharacterImageBase64] = useState(null);
   const [imagePrompts, setImagePrompts] = useState([]);
+  const [generatedImages, setGeneratedImages] = useState([]);
+  const [genProgress, setGenProgress] = useState(0);
   const [copiedIndex, setCopiedIndex] = useState(null);
 
   // --- API Utilities ---
   const callGemini = async (prompt, systemInstruction = "", useSearch = false, imageData = null) => {
-    // Check key from state instead of hardcoded constant
     if (!apiKey || apiKey.trim() === "") {
-        throw new Error("API Key is missing. Please enter it in the setup screen.");
+        throw new Error("API Key is missing. Please paste your key into line 16.");
     }
 
     let retries = 0;
@@ -152,9 +140,12 @@ The door is about to open. It always does.`);
         const result = await response.json();
         const generatedText = result.candidates?.[0]?.content?.parts?.[0]?.text;
         
-        if (!generatedText) throw new Error("The API returned an empty result.");
+        if (!generatedText) {
+          throw new Error("The API returned an empty result.");
+        }
         return generatedText;
       } catch (error) {
+        console.error("API Attempt Failed:", error);
         if (error.message.includes("400") || error.message.includes("401") || error.message.includes("403") || error.message.includes("404")) {
             throw error;
         }
@@ -165,59 +156,20 @@ The door is about to open. It always does.`);
     }
   };
 
-  // --- Security Logic ---
-  const handleApiKeySubmit = (e) => {
-    e.preventDefault();
-    if (apiKey.trim().startsWith("AIza")) {
-      setHasKey(true);
-      setStep(1); // Proceed to Ingestion Page
-    } else {
-      alert("Please enter a valid Gemini API Key (starts with AIza)");
-    }
-  };
-
-  const handleResetKey = () => {
-    setApiKey("");
-    setHasKey(false);
-    setStep(0);
-  };
-
   // --- Workflow Logic ---
+
   const analyzeAndGenerate = async () => {
     setLoading(true);
     try {
-      const systemPrompt = `You are a professional YouTube strategist and scriptwriter. 
-      TASK 1: Write a production script for a video titled "${videoTitle}" matching the provided transcript's style and tone. Ensure it is structured for high retention and targeted for an 8-minute video.
-      CRITICAL FOR TASK 1: The script must be PLAIN SPOKEN TEXT ONLY. Do not include any production cues, stage directions, speaker names, or bracketed instructions (e.g., [Music], [Scene transition], [Camera zooms]). The output must be ready to be pasted directly into a text-to-speech generator.
+      const systemPrompt = `You are a professional scriptwriter. Analyze the provided transcript and its original title for tone, style, and pacing. Then write a new script for a video titled "${videoTitle}" that matches that style and tone perfectly. Ensure the script is structured for an 8-minute video.`;
       
-      TASK 2: Write a compelling YouTube Video Description for this video by analyzing the "Source Description" provided. 
-      DESCRIPTION REQUIREMENTS:
-      - Match the tone and formatting style of the Source Description.
-      - Include an engaging hook and concise summary.
-      - List key talking points or timestamps.
-      - ESSENTIAL: Include a [SOURCES] section with relevant citations.
-      - ESSENTIAL: Place citations BEFORE the hashtag keyword section.
-      
-      Format your response with the following markers:
-      ---SCRIPT---
-      [Spoken content here]
-      ---DESCRIPTION---
-      [Description content here]`;
-      
-      const userPrompt = `Target Title: ${videoTitle}\nSource Title: ${sourceVideoTitle}\nSource Description: ${sourceDescription}\nSource Transcript: ${transcript}\nAdditional Details: ${additionalDetails}`;
-      
-      const response = await callGemini(userPrompt, systemPrompt);
-      
-      const scriptMatch = response.match(/---SCRIPT---([\s\S]*?)---DESCRIPTION---/);
-      const descMatch = response.match(/---DESCRIPTION---([\s\S]*)/);
-      
-      if (scriptMatch && descMatch) {
-        setGeneratedScript(scriptMatch[1].trim());
-        setGeneratedVideoDescription(descMatch[1].trim());
-      } else {
-        setGeneratedScript(response);
+      let userPrompt = `Original Source Video Title: ${sourceVideoTitle}\nSource Transcript: ${transcript}\n\nTarget Title: ${videoTitle}`;
+      if (additionalDetails && additionalDetails.trim() !== "") {
+        userPrompt += `\n\nAdditional Content/Instructions to Include:\n${additionalDetails}`;
       }
       
+      const script = await callGemini(userPrompt, systemPrompt);
+      setGeneratedScript(script);
       setStep(3);
     } catch (e) {
       alert(`Workflow Failed:\n${e.message}`);
@@ -231,7 +183,7 @@ The door is about to open. It always does.`);
     try {
       const systemPrompt = `You are a visual director. Generate EXACTLY 35 visual prompts based on the script.
       
-      CRITICAL INSTRUCTION: You MUST output ONLY the prompts. Start directly with "1.".
+      CRITICAL INSTRUCTION: You MUST output ONLY the prompts. Do not include any conversational text. Start directly with "1.".
       Every single prompt MUST follow this exact multi-paragraph template:
 
       [Camera Composition], [Location], [Time Period], [Time of Day (Optional)], [Architectural/Environmental Details (Optional)]. 
@@ -251,7 +203,9 @@ The door is about to open. It always does.`);
       const result = await callGemini(`Script: ${generatedScript}`, systemPrompt, false, characterImageBase64);
       
       const lines = result.split(/\n\d+\.|\d+\./);
-      const parsedPrompts = lines.map(p => p.trim()).filter(p => p.length > 100); 
+      const parsedPrompts = lines
+        .map(p => p.trim())
+        .filter(p => p.length > 100); 
 
       setImagePrompts(parsedPrompts.slice(0, 35));
       setStep(4);
@@ -289,6 +243,7 @@ The door is about to open. It always does.`);
     document.body.removeChild(textArea);
   };
 
+  // --- UI Components ---
   const BackButton = ({ onClick }) => (
     <button onClick={onClick} disabled={loading} className="mb-6 flex items-center gap-2 text-sm font-bold text-slate-400 hover:text-indigo-600 transition-colors uppercase tracking-wider">
       <ArrowLeft size={16} /> Back
@@ -302,94 +257,32 @@ The door is about to open. It always does.`);
           <div className="bg-indigo-600 p-2 rounded-xl text-white"><Clapperboard size={28} /></div>
           <h1 className="text-2xl font-black tracking-tight uppercase italic">DozeZen<span className="text-indigo-600">Workflow</span></h1>
         </div>
-        {hasKey && (
-          <button onClick={handleResetKey} className="text-[10px] bg-white border border-slate-200 hover:bg-slate-50 px-3 py-1.5 rounded-full font-bold uppercase tracking-widest transition-colors flex items-center gap-2 shadow-sm text-slate-500">
-            <Lock size={12} /> Reset Credentials
-          </button>
-        )}
+        <div className="text-xs text-slate-400 font-bold uppercase tracking-widest text-right">
+          Gemini 3 Beta Mode<br/>
+          <span className="text-[10px] text-slate-300">Strict Character Consistency Engine</span>
+        </div>
       </header>
 
-      <main className="max-w-6xl mx-auto bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden min-h-[600px]">
-        
-        {/* Step 0: Secure Setup Screen */}
-        {step === 0 && (
-          <div className="p-16 max-w-xl mx-auto text-center flex flex-col items-center justify-center h-full min-h-[500px]">
-            <div className="w-20 h-20 bg-indigo-50 text-indigo-600 rounded-3xl flex items-center justify-center mb-8 ring-8 ring-indigo-50/50">
-              <Key size={40} />
-            </div>
-            <h2 className="text-3xl font-black mb-4 tracking-tight">Security Gateway</h2>
-            <p className="text-slate-500 mb-10 leading-relaxed">To ensure your production account remains secure on GitHub, please enter your Gemini API key below. This key is used strictly for your current browser session and is never saved to the cloud.</p>
-            
-            <form onSubmit={handleApiKeySubmit} className="w-full space-y-4">
-              <div className="relative">
-                <input 
-                  type="password" 
-                  placeholder="Paste Gemini API Key (AIza...)" 
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  className="w-full p-5 rounded-2xl border-2 border-slate-100 focus:border-indigo-600 focus:ring-0 outline-none transition-all text-center font-mono text-lg shadow-sm"
-                />
-              </div>
-              <button type="submit" className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black text-lg hover:bg-indigo-700 transition-all active:scale-[0.99] shadow-lg shadow-indigo-200 flex items-center justify-center gap-3">
-                Unlock Studio <ArrowLeft className="rotate-180" size={20} />
-              </button>
-            </form>
-            
-            <p className="mt-8 text-[10px] text-slate-400 font-black uppercase tracking-widest flex items-center gap-2">
-              <AlertCircle size={12} /> Encryption Standard: Session Memory Only
-            </p>
-          </div>
-        )}
-
-        {/* Step 1: Ingestion Page */}
+      <main className="max-w-5xl mx-auto bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden min-h-[600px]">
         {step === 1 && (
           <div className="p-8">
-            <h2 className="text-2xl font-bold mb-8">1. Source Content Ingestion</h2>
-            <div className="grid lg:grid-cols-3 gap-8">
-              
-              {/* Target Details */}
+            <h2 className="text-2xl font-bold mb-6">Source Content</h2>
+            <div className="grid md:grid-cols-2 gap-8">
               <div className="space-y-4">
                 <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100">
-                  <h3 className="font-bold text-slate-900 mb-3 text-sm uppercase tracking-wider text-indigo-600">New Video Target</h3>
-                  <label className="block text-[10px] font-black text-slate-400 mb-1 uppercase">Video Title</label>
-                  <input type="text" value={videoTitle} onChange={(e) => setVideoTitle(e.target.value)} className="w-full bg-white p-3 rounded-xl border border-slate-200 shadow-sm outline-none mb-4" />
-                  
-                  <label className="block text-[10px] font-black text-slate-400 mb-1 uppercase">Additional Instructions</label>
-                  <textarea value={additionalDetails} onChange={(e) => setAdditionalDetails(e.target.value)} className="w-full bg-white p-3 rounded-xl border border-slate-200 shadow-sm outline-none h-32 resize-none text-sm" />
+                  <h3 className="font-bold text-slate-900 mb-2">New Video Title</h3>
+                  <input type="text" value={videoTitle} onChange={(e) => setVideoTitle(e.target.value)} className="w-full bg-white p-4 rounded-xl border border-slate-200 shadow-sm outline-none" />
+                </div>
+                <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100">
+                  <h3 className="font-bold text-slate-900 mb-2">Additional Instructions</h3>
+                  <textarea value={additionalDetails} onChange={(e) => setAdditionalDetails(e.target.value)} className="w-full bg-white p-4 rounded-xl border border-slate-200 shadow-sm outline-none h-32 resize-none" />
                 </div>
               </div>
-
-              {/* YouTube Reference */}
-              <div className="space-y-4">
-                <div className="p-6 bg-indigo-50/50 rounded-2xl border border-indigo-100">
-                  <div className="flex items-center gap-2 mb-3 text-indigo-600">
-                    <Video size={18} />
-                    <h3 className="font-bold text-sm uppercase tracking-wider">Competitive Reference</h3>
-                  </div>
-                  <label className="block text-[10px] font-black text-indigo-400 mb-1 uppercase">Source Video Title</label>
-                  <input type="text" placeholder="Title for tone reference..." value={sourceVideoTitle} onChange={(e) => setSourceVideoTitle(e.target.value)} className="w-full bg-white p-3 rounded-xl border border-slate-200 outline-none mb-4 text-sm" />
-                  
-                  <label className="block text-[10px] font-black text-indigo-400 mb-1 uppercase">Source Video Description</label>
-                  <textarea 
-                    value={sourceDescription} 
-                    onChange={(e) => setSourceDescription(e.target.value)} 
-                    placeholder="Paste the YouTube video description here to mimic style, sources, and keywords..." 
-                    className="w-full bg-white p-3 rounded-xl border border-slate-200 outline-none h-48 resize-none text-sm leading-relaxed" 
-                  />
-                </div>
-              </div>
-
-              {/* Knowledge Base */}
               <div className="flex flex-col gap-4">
-                <div className="flex-1 flex flex-col">
-                  <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase px-2">Transcript / Primary Research</label>
-                  <textarea value={transcript} onChange={(e) => setTranscript(e.target.value)} className="flex-1 w-full bg-slate-50 p-4 rounded-2xl border border-slate-200 outline-none resize-none min-h-[300px] font-mono text-xs leading-relaxed" />
-                </div>
-                <button onClick={() => setStep(2)} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-black transition-all flex items-center justify-center gap-2">
-                  Configure Visuals <ArrowLeft className="rotate-180" size={18} />
-                </button>
+                <input type="text" placeholder="Source Title..." value={sourceVideoTitle} onChange={(e) => setSourceVideoTitle(e.target.value)} className="bg-slate-50 p-4 rounded-xl border border-slate-200 outline-none" />
+                <textarea value={transcript} onChange={(e) => setTranscript(e.target.value)} className="flex-1 bg-slate-50 p-4 rounded-xl border border-slate-200 outline-none resize-none min-h-[200px]" />
+                <button onClick={() => setStep(2)} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-black transition-colors">Configure Character</button>
               </div>
-
             </div>
           </div>
         )}
@@ -397,10 +290,9 @@ The door is about to open. It always does.`);
         {step === 2 && (
           <div className="p-8 max-w-3xl mx-auto">
             <BackButton onClick={() => setStep(1)} />
-            <h2 className="text-2xl font-bold mb-8">2. Visual Consistency Engine</h2>
+            <h2 className="text-2xl font-bold mb-8">Character Engine</h2>
             <div className="space-y-6">
-              <label className="block text-[10px] font-black text-slate-400 mb-1 uppercase tracking-widest">Master Character Description</label>
-              <textarea value={characterRef} onChange={(e) => setCharacterRef(e.target.value)} className="w-full p-4 rounded-xl bg-slate-50 border border-slate-200 h-32 text-sm outline-none leading-relaxed" />
+              <textarea value={characterRef} onChange={(e) => setCharacterRef(e.target.value)} className="w-full p-4 rounded-xl bg-slate-50 border border-slate-200 h-32 text-sm outline-none" />
               
               <div className="flex flex-col items-center gap-4">
                 <label className="w-full border-2 border-dashed border-slate-200 rounded-xl p-8 text-center cursor-pointer hover:bg-slate-50 transition-colors">
@@ -410,17 +302,20 @@ The door is about to open. It always does.`);
                 </label>
 
                 {characterImageBase64 && (
-                  <div className="relative group w-40 h-40 rounded-xl overflow-hidden border border-slate-200 shadow-xl ring-4 ring-indigo-50">
+                  <div className="relative group w-32 h-32 rounded-xl overflow-hidden border border-slate-100 border shadow-lg">
                     <img src={characterImageBase64.previewUrl} alt="Reference" className="w-full h-full object-cover" />
-                    <button onClick={() => setCharacterImageBase64(null)} className="absolute top-2 right-2 bg-white/90 rounded-full p-2 text-red-500 hover:bg-red-600 hover:text-white transition-all">
-                      <Trash2 size={16}/>
+                    <button 
+                      onClick={() => setCharacterImageBase64(null)} 
+                      className="absolute top-1 right-1 bg-white/90 rounded-full p-1.5 text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors shadow-sm"
+                    >
+                      <Trash2 size={14}/>
                     </button>
                   </div>
                 )}
               </div>
 
-              <button onClick={analyzeAndGenerate} disabled={loading} className="w-full py-6 bg-indigo-600 text-white rounded-2xl font-black text-xl hover:bg-indigo-700 flex items-center justify-center gap-3 transition-all active:scale-[0.98]">
-                {loading ? <Loader2 className="animate-spin" /> : <Settings size={28} />} Run Full AI Workflow
+              <button onClick={analyzeAndGenerate} disabled={loading} className="w-full py-6 bg-indigo-600 text-white rounded-2xl font-black text-lg hover:bg-indigo-700 flex items-center justify-center gap-3 transition-all active:scale-[0.98]">
+                {loading ? <Loader2 className="animate-spin" /> : <Settings size={24} />} Run Full AI Workflow
               </button>
             </div>
           </div>
@@ -428,8 +323,8 @@ The door is about to open. It always does.`);
 
         {step === 3 && (
           <div className="p-8">
-            <div className="flex justify-between items-center mb-8">
-               <h2 className="text-2xl font-bold">3. Generated Script & Metadata</h2>
+            <div className="flex justify-between items-center mb-6">
+               <h2 className="text-2xl font-bold">Generated Script</h2>
                <button 
                 onClick={engineerPrompts} 
                 disabled={loading}
@@ -439,53 +334,27 @@ The door is about to open. It always does.`);
                  Generate Visual Prompts
                </button>
             </div>
-            
-            <div className="grid lg:grid-cols-2 gap-8">
-              <div>
-                <div className="flex items-center gap-2 mb-2 text-slate-400 uppercase font-black text-[10px] tracking-widest">
-                  <FileText size={14} /> Production Script (Narration Only)
-                </div>
-                <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100 whitespace-pre-wrap h-[500px] overflow-y-auto leading-relaxed font-serif text-lg">
-                  {generatedScript}
-                </div>
-              </div>
-              
-              <div>
-                <div className="flex items-center gap-2 mb-2 text-slate-400 uppercase font-black text-[10px] tracking-widest">
-                  <Video size={14} /> Optimized Video Description
-                </div>
-                <div className="bg-indigo-50/30 p-8 rounded-3xl border border-indigo-100 whitespace-pre-wrap h-[500px] overflow-y-auto leading-relaxed font-sans text-sm text-slate-700 shadow-inner">
-                  {generatedVideoDescription || "Description metadata processing failed, please check source input."}
-                </div>
-              </div>
-            </div>
+            <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100 whitespace-pre-wrap max-h-[500px] overflow-y-auto leading-relaxed font-serif">{generatedScript}</div>
           </div>
         )}
 
         {step === 4 && (
           <div className="p-8">
-            <h2 className="text-2xl font-bold mb-8">4. Visual Prompt Queue (35 Scenes)</h2>
+            <h2 className="text-2xl font-bold mb-8">Visual Prompt Queue</h2>
             <div className="grid grid-cols-1 gap-4 max-h-[600px] overflow-y-auto pr-4">
               {imagePrompts.map((p, i) => (
-                <div key={i} className="p-6 bg-slate-50 rounded-2xl border border-slate-200 relative group transition-all hover:border-indigo-300">
-                  <button onClick={() => copyPrompt(p, i)} className="absolute top-4 right-4 p-2 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition-all">
+                <div key={i} className="p-6 bg-slate-50 rounded-2xl border border-slate-200 relative group">
+                  <button onClick={() => copyPrompt(p, i)} className="absolute top-4 right-4 p-2 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-slate-100">
                     {copiedIndex === i ? <CheckCircle size={16} className="text-green-600" /> : <Copy size={16} />}
                   </button>
-                  <p className="text-xs font-bold text-indigo-600 mb-2 uppercase tracking-widest">Scene {i+1}</p>
-                  <div className="text-sm text-slate-700 leading-relaxed pr-12 whitespace-pre-wrap font-mono bg-white/50 p-4 rounded-lg border border-slate-100 italic">
-                    {p}
-                  </div>
+                  <p className="text-xs font-bold text-indigo-600 mb-2 uppercase">Scene {i+1}</p>
+                  <div className="text-sm text-slate-700 leading-relaxed pr-10 whitespace-pre-wrap font-mono bg-slate-100/50 p-4 rounded-lg border border-slate-200/50">{p}</div>
                 </div>
               ))}
             </div>
           </div>
         )}
       </main>
-      
-      <footer className="max-w-6xl mx-auto mt-8 flex justify-between items-center text-[10px] font-black text-slate-400 uppercase tracking-widest">
-        <span>Character Engine v3.1</span>
-        <span>Strict Boilerplate Enforced</span>
-      </footer>
     </div>
   );
 };
