@@ -7,16 +7,16 @@ import {
   CheckCircle, 
   Loader2, 
   Clapperboard, 
-  ArrowLeft,
-  Trash2,
-  AlertCircle,
-  Copy
+  ArrowLeft, 
+  Trash2, 
+  AlertCircle, 
+  Copy 
 } from 'lucide-react';
 
 // --- API Configuration ---
-const apiKey = "AIzaSyBsG8HDaXR1OFCW1UrPio8jts7op3WhtrU"; // Environment handles this
-const TEXT_MODEL = "gemini-2.5-flash-preview-09-2025";
-const IMAGE_MODEL = "gemini-2.5-flash-image-preview"; // Fallback for Nano Banana Pro
+const apiKey = "AIzaSyCAaCpg4Q6p17EMcxVS9dreQzsU4-JsAek"; 
+const TEXT_MODEL = "gemini-3-flash-preview"; 
+const IMAGE_MODEL = "gemini-3.1-flash-image-preview"; 
 
 const App = () => {
   const [step, setStep] = useState(1);
@@ -72,7 +72,7 @@ the polite way that power makes things clear, that a founder running a nearly $3
 
 rebranded into the language of culture without any of the content. What you lose is not the control. You expected to lose the control. What you lose is the specific feeling of watching something become what it was supposed to be. The iteration. The problem that finally gives, the late-night moment when a thing that didn't work yesterday works today, and the only people who know are the four of you in the room. That process, that was the only part that ever felt real. Now it belongs to someone else.
 
-And you have to sit in glass-walled offices and say nothing because you signed the paperwork. You were never the company. You were the origin story. Origin stories are useful for press releases. They don't run the quarterly business review. You resign on a Wednesday, mutual language, stock fully vested, number unchanged. This is the collapse, not poverty, not failure, just irrelevance. The specific modern violence of becoming optional inside
+And you have to sit in glass-walled offices and say nothing because you signed the paperwork. You were never the company. You were the origin story. origin stories are useful for press releases. They don't run the quarterly business review. You resign on a Wednesday, mutual language, stock fully vested, number unchanged. This is the collapse, not poverty, not failure, just irrelevance. The specific modern violence of becoming optional inside
 
 something you built. Part six, the engine. You try stopping. Three months. House in Nashville, money you will never need to touch, mornings with no meetings. You take walks. You read books you've been meaning to read for five years. You have dinner with people who have nothing to do with anything you've built. It is the most uncomfortable you have ever been because the hunger doesn't know what to do with comfort. It was built on the kitchen table in Gary, on the sorted envelopes, on your
 
@@ -95,6 +95,10 @@ The door is about to open. It always does.`);
 
   // --- API Utilities ---
   const callGemini = async (prompt, systemInstruction = "", useSearch = false, imageData = null) => {
+    if (!apiKey || apiKey.trim() === "") {
+        throw new Error("API Key is missing. Please paste your key into line 16.");
+    }
+
     let retries = 0;
     const maxRetries = 5;
     
@@ -119,64 +123,36 @@ The door is about to open. It always does.`);
           payload.systemInstruction = { parts: [{ text: systemInstruction }] };
         }
 
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${TEXT_MODEL}:generateContent?key=${apiKey}`, {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${TEXT_MODEL}:generateContent?key=${apiKey.trim()}`;
+
+        const response = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
 
         if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`API Error (${response.status}): ${errorText}`);
+          const errorJson = await response.json().catch(() => ({}));
+          const errorMsg = errorJson.error?.message || response.statusText;
+          throw new Error(`[${response.status}] ${errorMsg}`);
         }
         
         const result = await response.json();
         const generatedText = result.candidates?.[0]?.content?.parts?.[0]?.text;
         
         if (!generatedText) {
-          throw new Error("No text returned in the API response.");
+          throw new Error("The API returned an empty result.");
         }
         return generatedText;
       } catch (error) {
-        console.error(`Gemini API attempt ${retries + 1} failed:`, error);
-        // Fail instantly for authentication or bad request errors instead of retrying
-        if (error.message.includes("API Error (400)") || error.message.includes("API Error (401)") || error.message.includes("API Error (403)") || error.message.includes("API Error (404)")) {
+        console.error("API Attempt Failed:", error);
+        if (error.message.includes("400") || error.message.includes("401") || error.message.includes("403") || error.message.includes("404")) {
             throw error;
         }
         if (retries === maxRetries) throw error;
-        const delay = Math.pow(2, retries) * 1000;
-        await new Promise(res => setTimeout(res, delay));
+        await new Promise(res => setTimeout(res, Math.pow(2, retries) * 1000));
         retries++;
       }
-    }
-  };
-
-  const generateImage = async (promptText) => {
-    try {
-      const payload = {
-        contents: [{ role: "user", parts: [{ text: promptText }] }],
-        generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
-      };
-
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${IMAGE_MODEL}:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Image API Error (${response.status}): ${errorText}`);
-      }
-      
-      const result = await response.json();
-      const base64 = result.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
-      
-      if (!base64) throw new Error("No image data returned from model.");
-      return `data:image/png;base64,${base64}`;
-    } catch (error) {
-      console.error("Image generation error:", error);
-      return null;
     }
   };
 
@@ -196,8 +172,7 @@ The door is about to open. It always does.`);
       setGeneratedScript(script);
       setStep(3);
     } catch (e) {
-      console.error("analyzeAndGenerate error:", e);
-      alert(`Generation failed:\n\n${e.message}\n\n(Did you forget to add your API key in the code?)`);
+      alert(`Workflow Failed:\n${e.message}`);
     } finally {
       setLoading(false);
     }
@@ -206,54 +181,36 @@ The door is about to open. It always does.`);
   const engineerPrompts = async () => {
     setLoading(true);
     try {
-      const systemPrompt = `Based on the video script, generate 35 detailed visual scene descriptions for image generation. Each scene should represent a specific moment in the video.
+      const systemPrompt = `You are a visual director. Generate EXACTLY 35 visual prompts based on the script.
       
-      CRITICAL INSTRUCTION: You MUST output the exact boilerplate text below for EVERY SINGLE PROMPT. Do not summarize or omit the style descriptions. Replace the bracketed tags (like [Camera Composition] or [Actions]) with the specific details for that scene. Number each prompt (e.g., "1.", "2.").
+      CRITICAL INSTRUCTION: You MUST output ONLY the prompts. Do not include any conversational text. Start directly with "1.".
+      Every single prompt MUST follow this exact multi-paragraph template:
 
-      REQUIRED EXACT TEMPLATE FOR EVERY PROMPT:
       [Camera Composition], [Location], [Time Period], [Time of Day (Optional)], [Architectural/Environmental Details (Optional)]. 
       Clean cinematic minimalist prehistoric illustration style, simplified digital cartoon aesthetic, soft cel shading, muted earthy palette, atmospheric firelight, uncluttered composition, sharp polished vector-like rendering, modern explainer-animation look, simple geometric environments.
 
       All characters should have a minimalist cinematic cartoon character design with oversized smooth circular heads, tiny oval black eyes, simple mouth lines, clean back outlines, soft cel shading, simplified anatomy, rounded limbs, modern explainer-animation aesthetic, subtle fabric folds, muted/desaturated color palette, polished digital illustration, clean vector-like appearance, atmospheric lighting, uncluttered design.
 
-      Main Character: ${characterRef} ${characterImageBase64 ? '(Note: Align descriptions with the provided character reference image if applicable)' : ''}
-
+      Main Character: ${characterRef}
+      
       [Main Character Outfit Consistency]
       [Actions of main Character]
 
-      [Include the following block ONLY IF the scene has background characters]:
-      [Appropriate # of Background Characters] Background Characters. Background Characters should follow the exact same character design language and anatomy proportions as the Main Character, but vary in clothing, hairstyle, body shapes, age, accessories, and facial expressions. Include men, women, elderly people, children, workers, soldiers, merchants, peasants, nobles, etc depending on the setting and time period. Maintain the same minimalist rounded-head aesthetic and clean cinematic illustration style. 
-
+      Background Characters should follow the exact same character design language and anatomy proportions as the Main Character, but vary in clothing, hairstyle, body shapes, age, accessories, and facial expressions. Include men, women, elderly people, children, workers, soldiers, merchants, peasants, nobles, etc depending on the setting and time period. Maintain the same minimalist rounded-head aesthetic and clean cinematic illustration style. 
+      [Appropriate # of Background Characters (if 0, state "No background characters")]
       [Actions of Background Characters]`;
 
-      const result = await callGemini(`Generate 35 visual prompts for this script: ${generatedScript}`, systemPrompt, false, characterImageBase64);
+      const result = await callGemini(`Script: ${generatedScript}`, systemPrompt, false, characterImageBase64);
       
-      // Parse prompts - assuming AI returns a list or numbered segments
-      const parsedPrompts = result.split(/\d+\./).filter(p => p.trim().length > 50).map(p => p.trim());
+      const lines = result.split(/\n\d+\.|\d+\./);
+      const parsedPrompts = lines
+        .map(p => p.trim())
+        .filter(p => p.length > 100); 
+
       setImagePrompts(parsedPrompts.slice(0, 35));
       setStep(4);
     } catch (e) {
-      console.error("engineerPrompts error:", e);
-      alert(`Prompt engineering failed:\n\n${e.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const startBatchGeneration = async () => {
-    setLoading(true);
-    try {
-      const images = [];
-      for (let i = 0; i < imagePrompts.length; i++) {
-        const img = await generateImage(imagePrompts[i]);
-        if (img) images.push(img);
-        setGenProgress(Math.round(((i + 1) / imagePrompts.length) * 100));
-        setGeneratedImages([...images]);
-      }
-      setStep(5);
-    } catch (e) {
-      console.error("Batch generation error:", e);
-      alert(`Image batch generation failed:\n\n${e.message}`);
+      alert(`Prompt Engineering Failed: ${e.message}`);
     } finally {
       setLoading(false);
     }
@@ -280,302 +237,124 @@ The door is about to open. It always does.`);
     textArea.value = text;
     document.body.appendChild(textArea);
     textArea.select();
-    try {
-      document.execCommand('copy');
-      setCopiedIndex(index);
-      setTimeout(() => setCopiedIndex(null), 2000);
-    } catch (err) {
-      console.error('Failed to copy', err);
-    }
+    document.execCommand('copy');
+    setCopiedIndex(index);
+    setTimeout(() => setCopiedIndex(null), 2000);
     document.body.removeChild(textArea);
   };
 
   // --- UI Components ---
-
   const BackButton = ({ onClick }) => (
-    <button 
-      onClick={onClick}
-      disabled={loading}
-      className="mb-6 flex items-center gap-2 text-sm font-bold text-slate-400 hover:text-indigo-600 transition-colors uppercase tracking-wider"
-    >
+    <button onClick={onClick} disabled={loading} className="mb-6 flex items-center gap-2 text-sm font-bold text-slate-400 hover:text-indigo-600 transition-colors uppercase tracking-wider">
       <ArrowLeft size={16} /> Back
     </button>
-  );
-
-  const StepIndicator = () => (
-    <div className="flex justify-between mb-8 max-w-4xl mx-auto px-4">
-      {[1, 2, 3, 4, 5].map((i) => (
-        <div key={i} className="flex flex-col items-center relative z-10 w-full">
-          <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
-            step >= i ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-500'
-          } ${step === i ? 'ring-4 ring-indigo-100' : ''}`}>
-            {step > i ? <CheckCircle size={20} /> : i}
-          </div>
-          <span className="text-[9px] uppercase tracking-wider mt-2 font-bold text-slate-500 text-center">
-            {['Source', 'Settings', 'Script', 'Prompts', 'Visuals'][i-1]}
-          </span>
-        </div>
-      ))}
-    </div>
   );
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans p-4 md:p-8">
       <header className="max-w-6xl mx-auto flex items-center justify-between mb-12">
         <div className="flex items-center gap-3">
-          <div className="bg-indigo-600 p-2 rounded-xl text-white">
-            <Clapperboard size={28} />
-          </div>
+          <div className="bg-indigo-600 p-2 rounded-xl text-white"><Clapperboard size={28} /></div>
           <h1 className="text-2xl font-black tracking-tight uppercase italic">DozeZen<span className="text-indigo-600">Workflow</span></h1>
         </div>
-        <div className="text-xs text-slate-400 font-medium">WORKFLOW ENHANCEMENT SUITE</div>
+        <div className="text-xs text-slate-400 font-bold uppercase tracking-widest text-right">
+          Gemini 3 Beta Mode<br/>
+          <span className="text-[10px] text-slate-300">Strict Character Consistency Engine</span>
+        </div>
       </header>
 
-      <StepIndicator />
-
-      <main className="max-w-5xl mx-auto bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden min-h-[600px]">
-        
-        {/* Step 1: Source Content */}
+      <main className="max-w-5xl mx-auto bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden min-h-[600px]">
         {step === 1 && (
           <div className="p-8">
-            <h2 className="text-2xl font-bold mb-6">Source Transcript & Target Title</h2>
+            <h2 className="text-2xl font-bold mb-6">Source Content</h2>
             <div className="grid md:grid-cols-2 gap-8">
               <div className="space-y-4">
-                <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col justify-center">
-                  <h3 className="font-bold text-slate-900 mb-4 text-lg">Your New Video Title</h3>
-                  <p className="text-slate-500 text-sm mb-4">What will your newly generated video be called? The script will be tailored to match this topic.</p>
-                  <input 
-                    type="text"
-                    value={videoTitle}
-                    onChange={(e) => setVideoTitle(e.target.value)}
-                    placeholder="Enter your new video title..."
-                    className="w-full bg-white p-4 rounded-xl border border-slate-200 text-lg shadow-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                  />
+                <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100">
+                  <h3 className="font-bold text-slate-900 mb-2">New Video Title</h3>
+                  <input type="text" value={videoTitle} onChange={(e) => setVideoTitle(e.target.value)} className="w-full bg-white p-4 rounded-xl border border-slate-200 shadow-sm outline-none" />
                 </div>
-                <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col justify-center">
-                  <h3 className="font-bold text-slate-900 mb-4 text-lg">Additional Details <span className="text-slate-400 text-sm font-normal">(Optional)</span></h3>
-                  <p className="text-slate-500 text-sm mb-4">Any specific facts, talking points, or structural changes to include in the script?</p>
-                  <textarea 
-                    value={additionalDetails}
-                    onChange={(e) => setAdditionalDetails(e.target.value)}
-                    placeholder="e.g., Make sure to mention that ancient humans slept in segments, not 8 hours straight..."
-                    className="w-full bg-white p-4 rounded-xl border border-slate-200 text-sm shadow-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all resize-none min-h-[120px]"
-                  />
+                <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100">
+                  <h3 className="font-bold text-slate-900 mb-2">Additional Instructions</h3>
+                  <textarea value={additionalDetails} onChange={(e) => setAdditionalDetails(e.target.value)} className="w-full bg-white p-4 rounded-xl border border-slate-200 shadow-sm outline-none h-32 resize-none" />
                 </div>
               </div>
-              <div className="space-y-4 flex flex-col">
-                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                  <h3 className="font-bold text-slate-900 mb-2 text-sm">Source Video Title</h3>
-                  <input 
-                    type="text"
-                    value={sourceVideoTitle}
-                    onChange={(e) => setSourceVideoTitle(e.target.value)}
-                    placeholder="Enter the title of the original source video..."
-                    className="w-full bg-white p-3 rounded-xl border border-slate-200 text-sm shadow-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                  />
-                </div>
-                <div className="flex-1 flex flex-col">
-                  <textarea 
-                    className="w-full flex-1 p-6 rounded-2xl bg-slate-50 border-2 border-dashed border-slate-200 outline-none focus:border-indigo-400 min-h-[220px] text-sm resize-none"
-                    placeholder="Paste or review the transcript of the video you want to emulate here..."
-                    value={transcript}
-                    onChange={(e) => setTranscript(e.target.value)}
-                  />
-                </div>
-                <button 
-                  disabled={!transcript || !videoTitle || loading}
-                  onClick={() => setStep(2)}
-                  className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-black transition-colors disabled:opacity-50"
-                >
-                  Continue to Settings
-                </button>
+              <div className="flex flex-col gap-4">
+                <input type="text" placeholder="Source Title..." value={sourceVideoTitle} onChange={(e) => setSourceVideoTitle(e.target.value)} className="bg-slate-50 p-4 rounded-xl border border-slate-200 outline-none" />
+                <textarea value={transcript} onChange={(e) => setTranscript(e.target.value)} className="flex-1 bg-slate-50 p-4 rounded-xl border border-slate-200 outline-none resize-none min-h-[200px]" />
+                <button onClick={() => setStep(2)} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-black transition-colors">Configure Character</button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Step 2: Analysis & References */}
         {step === 2 && (
           <div className="p-8 max-w-3xl mx-auto">
             <BackButton onClick={() => setStep(1)} />
-            <h2 className="text-2xl font-bold mb-2">Character Consistency</h2>
-            <p className="text-slate-500 mb-8 text-sm">Define your main character once. We'll inject this into every image prompt to ensure consistency across the video.</p>
-            
+            <h2 className="text-2xl font-bold mb-8">Character Engine</h2>
             <div className="space-y-6">
-              <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Main Character Reference</label>
-                <textarea 
-                  className="w-full p-4 rounded-xl bg-slate-50 border border-slate-200 h-32 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                  value={characterRef}
-                  onChange={(e) => setCharacterRef(e.target.value)}
-                />
-              </div>
+              <textarea value={characterRef} onChange={(e) => setCharacterRef(e.target.value)} className="w-full p-4 rounded-xl bg-slate-50 border border-slate-200 h-32 text-sm outline-none" />
+              
+              <div className="flex flex-col items-center gap-4">
+                <label className="w-full border-2 border-dashed border-slate-200 rounded-xl p-8 text-center cursor-pointer hover:bg-slate-50 transition-colors">
+                  <ImageIcon className="mx-auto mb-2 text-slate-400" />
+                  <span className="text-sm font-medium text-slate-600">Upload Character Reference Sheet</span>
+                  <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
+                </label>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Character Image Reference (Optional)</label>
-                <div className="flex items-center gap-4">
-                   <label className="flex-1 border-2 border-dashed border-slate-200 rounded-xl p-6 flex flex-col items-center justify-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50 transition-all bg-slate-50">
-                      <ImageIcon size={24} className="text-slate-400 mb-2" />
-                      <span className="text-sm font-medium text-slate-600">Click to upload reference sheet</span>
-                      <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-                   </label>
-                   {characterImageBase64 && (
-                      <div className="relative w-24 h-24 rounded-xl overflow-hidden border border-slate-200 shrink-0 shadow-sm">
-                         <img src={characterImageBase64.previewUrl} alt="Reference" className="w-full h-full object-cover" />
-                         <button 
-                            onClick={() => setCharacterImageBase64(null)} 
-                            className="absolute top-1 right-1 bg-white/90 rounded-full p-1.5 text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors"
-                         >
-                            <Trash2 size={14}/>
-                         </button>
-                      </div>
-                   )}
-                </div>
-              </div>
-
-              <div className="bg-amber-50 border border-amber-100 p-4 rounded-xl flex gap-4 items-start">
-                <AlertCircle className="text-amber-600 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-amber-800 font-medium">The AI will now analyze your source transcript and rewrite it for "{videoTitle}" while preparing visual prompts in your prehistoric minimalist style.</p>
-              </div>
-
-              <button 
-                onClick={analyzeAndGenerate}
-                disabled={loading}
-                className="w-full py-6 bg-indigo-600 text-white rounded-2xl font-black text-lg hover:bg-indigo-700 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-              >
-                {loading ? <Loader2 className="animate-spin" /> : <Settings size={24} />}
-                Start Full AI Workflow
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 3: Review Script */}
-        {step === 3 && (
-          <div className="p-8">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <BackButton onClick={() => setStep(2)} />
-                <h2 className="text-2xl font-bold mt-2">Generated Script</h2>
-              </div>
-            </div>
-            <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100 text-slate-700 whitespace-pre-wrap max-h-[400px] overflow-y-auto text-lg leading-relaxed font-serif">
-              {generatedScript}
-            </div>
-            <div className="mt-8 flex justify-end">
-              <button 
-                onClick={engineerPrompts}
-                disabled={loading}
-                className="bg-indigo-600 text-white px-10 py-4 rounded-2xl font-bold flex items-center gap-3 disabled:opacity-50"
-              >
-                {loading ? <Loader2 className="animate-spin" /> : <FileText size={20} />}
-                Engineer 35 Visual Prompts
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 4: Visual Prompts & Gen Setup */}
-        {step === 4 && (
-          <div className="p-8">
-             <div className="flex items-center justify-between mb-8">
-              <div>
-                <BackButton onClick={() => setStep(3)} />
-                <h2 className="text-2xl font-bold mt-2">Visual Production Queue</h2>
-                <p className="text-slate-500 text-sm">We've generated {imagePrompts.length} scene prompts. Review them before batch processing.</p>
-              </div>
-              <button 
-                onClick={startBatchGeneration}
-                disabled={loading}
-                className="bg-indigo-600 text-white px-10 py-4 rounded-2xl font-bold flex items-center gap-3 shadow-lg shadow-indigo-200 disabled:opacity-50"
-              >
-                {loading ? <Loader2 className="animate-spin" /> : <ImageIcon size={20} />}
-                Generate {imagePrompts.length} Images
-              </button>
-            </div>
-
-            {loading && (
-              <div className="mb-8 bg-indigo-50 p-4 rounded-2xl border border-indigo-100">
-                <div className="flex justify-between text-xs font-black text-indigo-600 mb-2">
-                  <span>BATCH PRODUCTION IN PROGRESS</span>
-                  <span>{genProgress}%</span>
-                </div>
-                <div className="h-3 bg-indigo-200 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-indigo-600 transition-all duration-500" 
-                    style={{width: `${genProgress}%`}}
-                  />
-                </div>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 gap-6 max-h-[600px] overflow-y-auto pr-4">
-              {imagePrompts.map((prompt, idx) => (
-                <div key={idx} className="p-6 bg-slate-50 rounded-2xl border border-slate-200 text-sm leading-relaxed relative group">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="w-8 h-8 bg-indigo-100 text-indigo-700 rounded-full flex items-center justify-center font-black">{idx+1}</div>
+                {characterImageBase64 && (
+                  <div className="relative group w-32 h-32 rounded-xl overflow-hidden border border-slate-100 border shadow-lg">
+                    <img src={characterImageBase64.previewUrl} alt="Reference" className="w-full h-full object-cover" />
                     <button 
-                      onClick={() => copyPrompt(prompt, idx)}
-                      className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors shadow-sm"
+                      onClick={() => setCharacterImageBase64(null)} 
+                      className="absolute top-1 right-1 bg-white/90 rounded-full p-1.5 text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors shadow-sm"
                     >
-                      {copiedIndex === idx ? <CheckCircle size={14} className="text-green-600" /> : <Copy size={14} />}
-                      {copiedIndex === idx ? 'Copied!' : 'Copy Prompt'}
+                      <Trash2 size={14}/>
                     </button>
                   </div>
-                  <div className="whitespace-pre-wrap text-slate-700">{prompt}</div>
-                </div>
-              ))}
+                )}
+              </div>
+
+              <button onClick={analyzeAndGenerate} disabled={loading} className="w-full py-6 bg-indigo-600 text-white rounded-2xl font-black text-lg hover:bg-indigo-700 flex items-center justify-center gap-3 transition-all active:scale-[0.98]">
+                {loading ? <Loader2 className="animate-spin" /> : <Settings size={24} />} Run Full AI Workflow
+              </button>
             </div>
           </div>
         )}
 
-        {/* Step 5: Final Results */}
-        {step === 5 && (
+        {step === 3 && (
           <div className="p-8">
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <BackButton onClick={() => setStep(4)} />
-                <h2 className="text-2xl font-bold mt-2">Production Assets</h2>
-              </div>
-              <div className="flex gap-4">
-                <button 
-                  onClick={() => window.print()}
-                  className="px-6 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-slate-200"
-                >
-                  <Download size={18} /> Export Project
-                </button>
-                <button 
-                  onClick={() => setStep(1)}
-                  className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700"
-                >
-                  New Project
-                </button>
-              </div>
+            <div className="flex justify-between items-center mb-6">
+               <h2 className="text-2xl font-bold">Generated Script</h2>
+               <button 
+                onClick={engineerPrompts} 
+                disabled={loading}
+                className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-all active:scale-[0.98] disabled:opacity-50"
+               >
+                 {loading ? <Loader2 size={18} className="animate-spin" /> : <FileText size={18} />}
+                 Generate Visual Prompts
+               </button>
             </div>
+            <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100 whitespace-pre-wrap max-h-[500px] overflow-y-auto leading-relaxed font-serif">{generatedScript}</div>
+          </div>
+        )}
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {generatedImages.map((img, idx) => (
-                <div key={idx} className="group relative aspect-video bg-slate-100 rounded-2xl overflow-hidden border border-slate-200 shadow-sm transition-transform hover:scale-[1.02]">
-                  <img src={img} alt={`Scene ${idx+1}`} className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
-                    <span className="text-[10px] text-white font-bold uppercase tracking-widest">Scene {idx+1}</span>
-                  </div>
+        {step === 4 && (
+          <div className="p-8">
+            <h2 className="text-2xl font-bold mb-8">Visual Prompt Queue</h2>
+            <div className="grid grid-cols-1 gap-4 max-h-[600px] overflow-y-auto pr-4">
+              {imagePrompts.map((p, i) => (
+                <div key={i} className="p-6 bg-slate-50 rounded-2xl border border-slate-200 relative group">
+                  <button onClick={() => copyPrompt(p, i)} className="absolute top-4 right-4 p-2 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-slate-100">
+                    {copiedIndex === i ? <CheckCircle size={16} className="text-green-600" /> : <Copy size={16} />}
+                  </button>
+                  <p className="text-xs font-bold text-indigo-600 mb-2 uppercase">Scene {i+1}</p>
+                  <div className="text-sm text-slate-700 leading-relaxed pr-10 whitespace-pre-wrap font-mono bg-slate-100/50 p-4 rounded-lg border border-slate-200/50">{p}</div>
                 </div>
-              ))}
-              {loading && Array(4).fill(0).map((_, i) => (
-                 <div key={`load-${i}`} className="aspect-video bg-slate-50 rounded-2xl flex items-center justify-center border border-slate-100 border-dashed animate-pulse">
-                    <ImageIcon size={24} className="text-slate-300" />
-                 </div>
               ))}
             </div>
           </div>
         )}
-
       </main>
-
-      <footer className="max-w-5xl mx-auto mt-8 text-center text-slate-400 text-xs font-medium">
-        Designed for High-Volume Content Production • Character Consistency Engine v1.0
-      </footer>
     </div>
   );
 };
