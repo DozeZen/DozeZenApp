@@ -224,21 +224,16 @@ The door is about to open. It always does.`);
       try {
         let response;
         if (isImageToImage) {
-          // EXPLICIT WIDESCREEN ENFORCEMENT: Force 16:9 for consistency model
+          // Robust multi-modal payload for character consistency + Aspect Ratio Instruction
           const payload = {
             contents: [{ 
               role: "user",
               parts: [
-                { text: `TASK: Generate a high-quality cinematic illustration in a HORIZONTAL 16:9 WIDESCREEN format. 
-                CRITICAL: The final image MUST be WIDE (landscape), NOT vertical. Ignore the aspect ratio of the reference image.
-                SCENE DESCRIPTION: ${promptText}
-                CHARACTER REFERENCE: Use the attached image STRICTLY for facial features and build consistency.` },
+                { text: `INSTRUCTIONS: You are an image generator. Create a high-quality cinematic illustration in 16:9 aspect ratio based on the SCENE DESCRIPTION provided. Use the attached image STRICTLY as a reference for the character's facial features and build.\n\nSCENE DESCRIPTION: ${promptText}` },
                 { inlineData: { mimeType: characterImageBase64.mimeType, data: characterImageBase64.data } }
               ] 
             }],
-            generationConfig: { 
-              responseModalities: ['TEXT', 'IMAGE']
-            }
+            generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
           };
           
           response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${apiKey}`, {
@@ -258,7 +253,7 @@ The door is about to open. It always does.`);
           return `data:image/png;base64,${base64}`;
           
         } else {
-          // Standard Imagen predict endpoint with explicit 16:9 parameter
+          // Standard Imagen predict endpoint with 16:9 aspect ratio parameter
           response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:predict?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -644,6 +639,7 @@ The door is about to open. It always does.`);
             </div>
             
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 flex-1 min-h-0 overflow-hidden">
+              {/* Full Script Sidebar - Independent Scroll */}
               <div className="lg:col-span-4 flex flex-col h-full bg-slate-50 rounded-3xl p-6 border border-slate-200">
                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2 shrink-0">
                   <FileText size={14} /> Full Production Script
@@ -653,6 +649,7 @@ The door is about to open. It always does.`);
                 </div>
               </div>
 
+              {/* Prompts Column - Independent Scroll */}
               <div className="lg:col-span-8 overflow-y-auto pr-4 space-y-6 pb-20 custom-scrollbar">
                 {imagePrompts.map((scene, i) => (
                   <div key={i} className="p-6 bg-slate-50 rounded-2xl border border-slate-200 relative group transition-colors hover:border-indigo-300">
@@ -700,7 +697,7 @@ The door is about to open. It always does.`);
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 flex-1 min-h-0 overflow-y-auto pr-4 pb-12 custom-scrollbar">
               {imagePrompts.map((scene, i) => (
                 <div key={i} className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden flex flex-col shadow-sm h-fit">
-                  <div className="aspect-video bg-slate-200 relative flex items-center justify-center border-b border-slate-200 overflow-hidden">
+                  <div className="aspect-video bg-slate-200 relative flex items-center justify-center border-b border-slate-200">
                     {generatedImages[i] ? (
                       <img src={generatedImages[i]} alt={`Scene ${i+1}`} className="w-full h-full object-cover" />
                     ) : (

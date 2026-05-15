@@ -224,21 +224,16 @@ The door is about to open. It always does.`);
       try {
         let response;
         if (isImageToImage) {
-          // EXPLICIT WIDESCREEN ENFORCEMENT: Force 16:9 for consistency model
+          // Fixed Character Consistency Engine: Force strict adherence to visual prompt while referencing image.
           const payload = {
             contents: [{ 
-              role: "user",
+              role: "user", 
               parts: [
-                { text: `TASK: Generate a high-quality cinematic illustration in a HORIZONTAL 16:9 WIDESCREEN format. 
-                CRITICAL: The final image MUST be WIDE (landscape), NOT vertical. Ignore the aspect ratio of the reference image.
-                SCENE DESCRIPTION: ${promptText}
-                CHARACTER REFERENCE: Use the attached image STRICTLY for facial features and build consistency.` },
+                { text: `INSTRUCTIONS: You are an image generator. Create a high-quality cinematic illustration in 16:9 aspect ratio based on the SCENE DESCRIPTION provided. Use the attached image STRICTLY as a reference for the character's facial features and build.\n\nSCENE DESCRIPTION: ${promptText}` },
                 { inlineData: { mimeType: characterImageBase64.mimeType, data: characterImageBase64.data } }
               ] 
             }],
-            generationConfig: { 
-              responseModalities: ['TEXT', 'IMAGE']
-            }
+            generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
           };
           
           response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${apiKey}`, {
@@ -249,16 +244,16 @@ The door is about to open. It always does.`);
           
           if (!response.ok) {
             const err = await response.json().catch(() => ({}));
-            throw new Error(`[${response.status}] ${err.error?.message || 'Consistency Gen Failed'}`);
+            throw new Error(`[${response.status}] ${err.error?.message || 'Generation Failed'}`);
           }
-          
+
           const result = await response.json();
           const base64 = result.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
-          if (!base64) throw new Error("Model failed to output an image part.");
+          if (!base64) throw new Error("The AI failed to generate an image block.");
           return `data:image/png;base64,${base64}`;
           
         } else {
-          // Standard Imagen predict endpoint with explicit 16:9 parameter
+          // Standard Imagen predict endpoint with 16:9 aspect ratio parameter
           response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:predict?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -559,24 +554,13 @@ The door is about to open. It always does.`);
                 )}
               </div>
 
-              <div className="flex flex-col gap-3">
-                <button onClick={analyzeAndGenerate} disabled={loading} className="w-full py-6 bg-indigo-600 text-white rounded-2xl font-black text-lg hover:bg-indigo-700 flex items-center justify-center gap-3 transition-all active:scale-[0.98] relative overflow-hidden">
-                  {loading && <div className="absolute left-0 top-0 bottom-0 bg-indigo-800 transition-all duration-300 z-0" style={{ width: `${genProgress}%` }} />}
-                  <span className="relative z-10 flex items-center justify-center gap-3">
-                    {loading ? <Loader2 className="animate-spin" /> : <Settings size={28} />} 
-                    {loading ? `Processing... ${Math.round(genProgress)}%` : 'Run Full AI Workflow'}
-                  </span>
-                </button>
-
-                {generatedScript && !loading && (
-                  <button 
-                    onClick={() => setStep(3)} 
-                    className="w-full py-4 bg-slate-100 text-slate-700 rounded-2xl font-bold hover:bg-slate-200 transition-colors flex items-center justify-center gap-2"
-                  >
-                    Continue to Generated Content <ArrowLeft className="rotate-180" size={18} />
-                  </button>
-                )}
-              </div>
+              <button onClick={analyzeAndGenerate} disabled={loading} className="w-full py-6 bg-indigo-600 text-white rounded-2xl font-black text-lg hover:bg-indigo-700 flex items-center justify-center gap-3 transition-all active:scale-[0.98] relative overflow-hidden">
+                {loading && <div className="absolute left-0 top-0 bottom-0 bg-indigo-800 transition-all duration-300 z-0" style={{ width: `${genProgress}%` }} />}
+                <span className="relative z-10 flex items-center justify-center gap-3">
+                  {loading ? <Loader2 className="animate-spin" /> : <Settings size={28} />} 
+                  {loading ? `Processing... ${Math.round(genProgress)}%` : 'Run Full AI Workflow'}
+                </span>
+              </button>
             </div>
           </div>
         )}
@@ -586,28 +570,17 @@ The door is about to open. It always does.`);
             <BackButton onClick={() => setStep(2)} />
             <div className="flex justify-between items-center mb-8">
                <h2 className="text-2xl font-bold">3. Generated Content & Metadata</h2>
-               <div className="flex gap-3">
-                 <button 
-                  onClick={engineerPrompts} 
-                  disabled={loading}
-                  className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-all active:scale-[0.98] disabled:opacity-50 relative overflow-hidden"
-                 >
-                   {loading && <div className="absolute left-0 top-0 bottom-0 bg-indigo-800 transition-all duration-300 z-0" style={{ width: `${genProgress}%` }} />}
-                   <span className="relative z-10 flex items-center justify-center gap-2">
-                     {loading ? <Loader2 size={18} className="animate-spin" /> : <FileText size={18} />}
-                     {loading ? `Generating ${Math.round(genProgress)}%` : 'Generate Visual Prompts'}
-                   </span>
-                 </button>
-
-                 {imagePrompts.length > 0 && !loading && (
-                   <button 
-                    onClick={() => setStep(4)}
-                    className="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-black transition-all active:scale-[0.98]"
-                   >
-                     Next: Visual Queue <ArrowLeft size={18} className="rotate-180" />
-                   </button>
-                 )}
-               </div>
+               <button 
+                onClick={engineerPrompts} 
+                disabled={loading}
+                className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-all active:scale-[0.98] disabled:opacity-50 relative overflow-hidden"
+               >
+                 {loading && <div className="absolute left-0 top-0 bottom-0 bg-indigo-800 transition-all duration-300 z-0" style={{ width: `${genProgress}%` }} />}
+                 <span className="relative z-10 flex items-center justify-center gap-2">
+                   {loading ? <Loader2 size={18} className="animate-spin" /> : <FileText size={18} />}
+                   {loading ? `Generating ${Math.round(genProgress)}%` : 'Generate Visual Prompts'}
+                 </span>
+               </button>
             </div>
             
             <div className="grid lg:grid-cols-2 gap-8 flex-1 min-h-0 overflow-hidden">
@@ -700,7 +673,7 @@ The door is about to open. It always does.`);
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 flex-1 min-h-0 overflow-y-auto pr-4 pb-12 custom-scrollbar">
               {imagePrompts.map((scene, i) => (
                 <div key={i} className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden flex flex-col shadow-sm h-fit">
-                  <div className="aspect-video bg-slate-200 relative flex items-center justify-center border-b border-slate-200 overflow-hidden">
+                  <div className="aspect-video bg-slate-200 relative flex items-center justify-center border-b border-slate-200">
                     {generatedImages[i] ? (
                       <img src={generatedImages[i]} alt={`Scene ${i+1}`} className="w-full h-full object-cover" />
                     ) : (

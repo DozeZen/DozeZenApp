@@ -224,21 +224,15 @@ The door is about to open. It always does.`);
       try {
         let response;
         if (isImageToImage) {
-          // EXPLICIT WIDESCREEN ENFORCEMENT: Force 16:9 for consistency model
+          // Robust multi-modal payload for character consistency
           const payload = {
             contents: [{ 
-              role: "user",
               parts: [
-                { text: `TASK: Generate a high-quality cinematic illustration in a HORIZONTAL 16:9 WIDESCREEN format. 
-                CRITICAL: The final image MUST be WIDE (landscape), NOT vertical. Ignore the aspect ratio of the reference image.
-                SCENE DESCRIPTION: ${promptText}
-                CHARACTER REFERENCE: Use the attached image STRICTLY for facial features and build consistency.` },
+                { text: `Reference Character: ${characterRef}\nGenerate a high-quality illustration based on this prompt: ${promptText}` },
                 { inlineData: { mimeType: characterImageBase64.mimeType, data: characterImageBase64.data } }
               ] 
             }],
-            generationConfig: { 
-              responseModalities: ['TEXT', 'IMAGE']
-            }
+            generationConfig: { responseModalities: ['IMAGE'] }
           };
           
           response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${apiKey}`, {
@@ -258,17 +252,11 @@ The door is about to open. It always does.`);
           return `data:image/png;base64,${base64}`;
           
         } else {
-          // Standard Imagen predict endpoint with explicit 16:9 parameter
+          // Standard Imagen predict endpoint
           response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:predict?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              instances: { prompt: promptText }, 
-              parameters: { 
-                sampleCount: 1,
-                aspectRatio: "16:9" 
-              } 
-            })
+            body: JSON.stringify({ instances: { prompt: promptText }, parameters: { sampleCount: 1 } })
           });
           
           if (!response.ok) {
@@ -463,7 +451,7 @@ The door is about to open. It always does.`);
 
   // --- UI Components ---
   const BackButton = ({ onClick }) => (
-    <button onClick={onClick} disabled={loading} className="mb-6 flex items-center gap-2 text-sm font-bold text-slate-400 hover:text-indigo-600 transition-colors uppercase tracking-wider shrink-0">
+    <button onClick={onClick} disabled={loading} className="mb-6 flex items-center gap-2 text-sm font-bold text-slate-400 hover:text-indigo-600 transition-colors uppercase tracking-wider">
       <ArrowLeft size={16} /> Back
     </button>
   );
@@ -533,7 +521,7 @@ The door is about to open. It always does.`);
         )}
 
         {step === 2 && (
-          <div className="p-8 max-w-3xl mx-auto overflow-y-auto text-center flex flex-col justify-center min-h-[600px]">
+          <div className="p-8 max-w-3xl mx-auto overflow-y-auto">
             <BackButton onClick={() => setStep(1)} />
             <h2 className="text-2xl font-bold mb-8">Character Engine</h2>
             <div className="space-y-6">
@@ -559,73 +547,50 @@ The door is about to open. It always does.`);
                 )}
               </div>
 
-              <div className="flex flex-col gap-3">
-                <button onClick={analyzeAndGenerate} disabled={loading} className="w-full py-6 bg-indigo-600 text-white rounded-2xl font-black text-lg hover:bg-indigo-700 flex items-center justify-center gap-3 transition-all active:scale-[0.98] relative overflow-hidden">
-                  {loading && <div className="absolute left-0 top-0 bottom-0 bg-indigo-800 transition-all duration-300 z-0" style={{ width: `${genProgress}%` }} />}
-                  <span className="relative z-10 flex items-center justify-center gap-3">
-                    {loading ? <Loader2 className="animate-spin" /> : <Settings size={28} />} 
-                    {loading ? `Processing... ${Math.round(genProgress)}%` : 'Run Full AI Workflow'}
-                  </span>
-                </button>
-
-                {generatedScript && !loading && (
-                  <button 
-                    onClick={() => setStep(3)} 
-                    className="w-full py-4 bg-slate-100 text-slate-700 rounded-2xl font-bold hover:bg-slate-200 transition-colors flex items-center justify-center gap-2"
-                  >
-                    Continue to Generated Content <ArrowLeft className="rotate-180" size={18} />
-                  </button>
-                )}
-              </div>
+              <button onClick={analyzeAndGenerate} disabled={loading} className="w-full py-6 bg-indigo-600 text-white rounded-2xl font-black text-lg hover:bg-indigo-700 flex items-center justify-center gap-3 transition-all active:scale-[0.98] relative overflow-hidden">
+                {loading && <div className="absolute left-0 top-0 bottom-0 bg-indigo-800 transition-all duration-300 z-0" style={{ width: `${genProgress}%` }} />}
+                <span className="relative z-10 flex items-center justify-center gap-3">
+                  {loading ? <Loader2 className="animate-spin" /> : <Settings size={28} />} 
+                  {loading ? `Processing... ${Math.round(genProgress)}%` : 'Run Full AI Workflow'}
+                </span>
+              </button>
             </div>
           </div>
         )}
 
         {step === 3 && (
-          <div className="p-8 overflow-y-auto flex flex-col h-full">
-            <BackButton onClick={() => setStep(2)} />
+          <div className="p-8 overflow-y-auto">
             <div className="flex justify-between items-center mb-8">
                <h2 className="text-2xl font-bold">3. Generated Content & Metadata</h2>
-               <div className="flex gap-3">
-                 <button 
-                  onClick={engineerPrompts} 
-                  disabled={loading}
-                  className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-all active:scale-[0.98] disabled:opacity-50 relative overflow-hidden"
-                 >
-                   {loading && <div className="absolute left-0 top-0 bottom-0 bg-indigo-800 transition-all duration-300 z-0" style={{ width: `${genProgress}%` }} />}
-                   <span className="relative z-10 flex items-center justify-center gap-2">
-                     {loading ? <Loader2 size={18} className="animate-spin" /> : <FileText size={18} />}
-                     {loading ? `Generating ${Math.round(genProgress)}%` : 'Generate Visual Prompts'}
-                   </span>
-                 </button>
-
-                 {imagePrompts.length > 0 && !loading && (
-                   <button 
-                    onClick={() => setStep(4)}
-                    className="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-black transition-all active:scale-[0.98]"
-                   >
-                     Next: Visual Queue <ArrowLeft size={18} className="rotate-180" />
-                   </button>
-                 )}
-               </div>
+               <button 
+                onClick={engineerPrompts} 
+                disabled={loading}
+                className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-all active:scale-[0.98] disabled:opacity-50 relative overflow-hidden"
+               >
+                 {loading && <div className="absolute left-0 top-0 bottom-0 bg-indigo-800 transition-all duration-300 z-0" style={{ width: `${genProgress}%` }} />}
+                 <span className="relative z-10 flex items-center justify-center gap-2">
+                   {loading ? <Loader2 size={18} className="animate-spin" /> : <FileText size={18} />}
+                   {loading ? `Generating ${Math.round(genProgress)}%` : 'Generate Visual Prompts'}
+                 </span>
+               </button>
             </div>
             
-            <div className="grid lg:grid-cols-2 gap-8 flex-1 min-h-0 overflow-hidden">
-              <div className="flex flex-col h-full">
+            <div className="grid lg:grid-cols-2 gap-8">
+              <div>
                 <div className="flex justify-between items-center gap-2 mb-2 text-slate-400 uppercase font-black text-[10px] tracking-widest">
                   <span className="flex items-center gap-2"><FileText size={14} /> Production Script</span>
                   <a href="https://elevenlabs.io/app/home" target="_blank" rel="noopener noreferrer" className="text-indigo-500 hover:text-indigo-700 normal-case tracking-normal">Generate TTS on ElevenLabs</a>
                 </div>
-                <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100 whitespace-pre-wrap flex-1 overflow-y-auto leading-relaxed font-serif text-lg custom-scrollbar">
+                <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100 whitespace-pre-wrap h-[500px] overflow-y-auto leading-relaxed font-serif text-lg">
                   {generatedScript}
                 </div>
               </div>
               
-              <div className="flex flex-col h-full">
+              <div>
                 <div className="flex items-center gap-2 mb-2 text-slate-400 uppercase font-black text-[10px] tracking-widest">
                   <Video size={14} /> Optimized Video Description
                 </div>
-                <div className="bg-indigo-50/30 p-8 rounded-3xl border border-indigo-100 whitespace-pre-wrap flex-1 overflow-y-auto leading-relaxed font-sans text-sm text-slate-700 shadow-inner custom-scrollbar">
+                <div className="bg-indigo-50/30 p-8 rounded-3xl border border-indigo-100 whitespace-pre-wrap h-[500px] overflow-y-auto leading-relaxed font-sans text-sm text-slate-700 shadow-inner">
                   {generatedVideoDescription || "Analysis complete. Script generated above. Description metadata processing failed, please check source input."}
                 </div>
               </div>
@@ -635,7 +600,6 @@ The door is about to open. It always does.`);
 
         {step === 4 && (
           <div className="p-8 flex flex-col h-full min-h-0">
-            <BackButton onClick={() => setStep(3)} />
             <div className="flex justify-between items-center mb-8 shrink-0">
               <h2 className="text-2xl font-bold">4. Visual Prompt Queue ({imagePrompts.length} Scenes)</h2>
               <button onClick={() => setStep(5)} className="bg-indigo-600 text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors shadow-lg active:scale-95 flex items-center gap-2">
@@ -644,6 +608,7 @@ The door is about to open. It always does.`);
             </div>
             
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 flex-1 min-h-0 overflow-hidden">
+              {/* Full Script Sidebar - Independent Scroll */}
               <div className="lg:col-span-4 flex flex-col h-full bg-slate-50 rounded-3xl p-6 border border-slate-200">
                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2 shrink-0">
                   <FileText size={14} /> Full Production Script
@@ -653,6 +618,7 @@ The door is about to open. It always does.`);
                 </div>
               </div>
 
+              {/* Prompts Column - Independent Scroll */}
               <div className="lg:col-span-8 overflow-y-auto pr-4 space-y-6 pb-20 custom-scrollbar">
                 {imagePrompts.map((scene, i) => (
                   <div key={i} className="p-6 bg-slate-50 rounded-2xl border border-slate-200 relative group transition-colors hover:border-indigo-300">
@@ -700,7 +666,7 @@ The door is about to open. It always does.`);
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 flex-1 min-h-0 overflow-y-auto pr-4 pb-12 custom-scrollbar">
               {imagePrompts.map((scene, i) => (
                 <div key={i} className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden flex flex-col shadow-sm h-fit">
-                  <div className="aspect-video bg-slate-200 relative flex items-center justify-center border-b border-slate-200 overflow-hidden">
+                  <div className="aspect-video bg-slate-200 relative flex items-center justify-center border-b border-slate-200">
                     {generatedImages[i] ? (
                       <img src={generatedImages[i]} alt={`Scene ${i+1}`} className="w-full h-full object-cover" />
                     ) : (

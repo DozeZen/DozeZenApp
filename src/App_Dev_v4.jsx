@@ -12,16 +12,13 @@ import {
   AlertCircle, 
   Copy,
   Video,
-  Info,
-  Sparkles,
-  RefreshCw
+  Info
 } from 'lucide-react';
 
 // --- API Configuration ---
 const apiKey = "AIzaSyCSqjaoIQ2xoIfP5_pWIcMFElquqhnPdwI"; 
 const TEXT_MODEL = "gemini-3.1-pro-preview"; 
-const IMAGE_GEN_MODEL = "imagen-4.0-generate-001"; 
-const IMAGE_REF_MODEL = "gemini-2.5-flash-image";
+const IMAGE_MODEL = "gemini-3.1-pro-preview"; 
 
 const App = () => {
   const [step, setStep] = useState(1);
@@ -75,7 +72,7 @@ measurement. How far you already are from where you started, how much further yo
 
 yet. You watch your father get passed over for a supervisor role he'd been doing informally for two years. The company hires someone from outside. Your father says nothing about it at dinner. Your mother asks if anyone wants more rice. You watch him reach for the rice and understand with a clarity that is much too heavy for a 16-year-old, that the system was not designed with your father in mind. You decide, sitting at that table, that you will learn the system well enough to
 
-build one of your own. Part two, the mentor. His name is Calvin Marsh. His age is 31 and already worth $22 million and he speaks at your high school's entrepreneurship day because his nephew goes there and he owed his sister a favor. He is the only person in the room who does not seem impressed by being in the room. Everyone else is half asleep. You are taking notes. After the assembly, you follow him to the parking lot. You don't plan it. Your feet just go. He's loading into a car that costs more than
+build one of your own. Part two, the mentor. His name is Calvin Marsh. He is 31 and already worth $22 million and he speaks at your high school's entrepreneurship day because his nephew goes there and he owed his sister a favor. He is the only person in the room who does not seem impressed by being in the room. Everyone else is half asleep. You are taking notes. After the assembly, you follow him to the parking lot. You don't plan it. Your feet just go. He's loading into a car that costs more than
 
 everything in your house combined and you say, "What part of the speech was true?" He stops. He looks at you the way people look at something that moved when it wasn't supposed to. "Which part did you think wasn't?" "The part about passion. Nobody builds something real on passion. Passion is what you say when you don't want to explain the actual reason." He is quiet for a moment. Then he says, "You got a phone?" He sends you a Dropbox link, a folder of
 
@@ -115,7 +112,7 @@ rebranded into the language of culture without any of the content. What you lose
 
 And you have to sit in glass-walled offices and say nothing because you signed the paperwork. You were never the company. You were the origin story. origin stories are useful for press releases. They don't run the quarterly business review. You resign on a Wednesday, mutual language, stock fully vested, number unchanged. This is the collapse, not poverty, not failure, just irrelevance. The specific modern violence of becoming optional inside
 
-something you built. Part six, the engine. You try stopping. Three months. House in Nashville, money you will never need to touch, mornings with no meetings. You take walks. You read books you've been meaning to read for five years. You have dinner with people who have nothing to do with anything you've built. It is the most unprofessional you have ever been because the hunger doesn't know what to do with comfort. It was built on the kitchen table in Gary, on the sorted envelopes, on your
+something you built. Part six, the engine. You try stopping. Three months. House in Nashville, money you will never need to touch, mornings with no meetings. You take walks. You read books you've been meaning to read for five years. You have dinner with people who have nothing to do with anything you've built. It is the most uncomfortable you have ever been because the hunger doesn't know what to do with comfort. It was built on the kitchen table in Gary, on the sorted envelopes, on your
 
 father's face when the supervisor job went to someone else. It was built to solve a problem. And the problem is solved now. The house exists, the retirement exists, the forklift shift is done. But the hunger doesn't know that. The hunger is still running. It doesn't check the account balance. It just runs. Six months after you resign, you incorporate again. New city, new problem. Smarter this time, leaner, built on everything the first one cost you.
 
@@ -136,11 +133,6 @@ The door is about to open. It always does.`);
   const [copiedIndex, setCopiedIndex] = useState(null);
   const [genProgress, setGenProgress] = useState(0); 
   const progressInterval = useRef(null);
-
-  // Image Generation States
-  const [generatedImages, setGeneratedImages] = useState({});
-  const [imageLoadingStates, setImageLoadingStates] = useState({});
-  const [batchGenLoading, setBatchGenLoading] = useState(false);
 
   const startProgress = () => {
     setGenProgress(0);
@@ -213,81 +205,6 @@ The door is about to open. It always does.`);
     }
   };
 
-  const callImageModel = async (promptText) => {
-    let retries = 0;
-    const maxRetries = 5;
-    
-    const isImageToImage = characterImageBase64 && characterImageBase64.data;
-    const modelToUse = isImageToImage ? IMAGE_REF_MODEL : IMAGE_GEN_MODEL;
-    
-    while (retries <= maxRetries) {
-      try {
-        let response;
-        if (isImageToImage) {
-          // EXPLICIT WIDESCREEN ENFORCEMENT: Force 16:9 for consistency model
-          const payload = {
-            contents: [{ 
-              role: "user",
-              parts: [
-                { text: `TASK: Generate a high-quality cinematic illustration in a HORIZONTAL 16:9 WIDESCREEN format. 
-                CRITICAL: The final image MUST be WIDE (landscape), NOT vertical. Ignore the aspect ratio of the reference image.
-                SCENE DESCRIPTION: ${promptText}
-                CHARACTER REFERENCE: Use the attached image STRICTLY for facial features and build consistency.` },
-                { inlineData: { mimeType: characterImageBase64.mimeType, data: characterImageBase64.data } }
-              ] 
-            }],
-            generationConfig: { 
-              responseModalities: ['TEXT', 'IMAGE']
-            }
-          };
-          
-          response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-          
-          if (!response.ok) {
-            const err = await response.json().catch(() => ({}));
-            throw new Error(`[${response.status}] ${err.error?.message || 'Consistency Gen Failed'}`);
-          }
-          
-          const result = await response.json();
-          const base64 = result.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
-          if (!base64) throw new Error("Model failed to output an image part.");
-          return `data:image/png;base64,${base64}`;
-          
-        } else {
-          // Standard Imagen predict endpoint with explicit 16:9 parameter
-          response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:predict?key=${apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              instances: { prompt: promptText }, 
-              parameters: { 
-                sampleCount: 1,
-                aspectRatio: "16:9" 
-              } 
-            })
-          });
-          
-          if (!response.ok) {
-            const errorJson = await response.json().catch(() => ({}));
-            throw new Error(errorJson.error?.message || `[${response.status}] Image Gen Failed`);
-          }
-          
-          const result = await response.json();
-          return `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`;
-        }
-      } catch (e) {
-        if (e.message.includes("401") || e.message.includes("404")) throw e;
-        if (retries === maxRetries) throw e;
-        await new Promise(r => setTimeout(r, Math.pow(2, retries) * 1000));
-        retries++;
-      }
-    }
-  };
-
   // --- Workflow Logic ---
 
   const analyzeAndGenerate = async () => {
@@ -344,10 +261,10 @@ The door is about to open. It always does.`);
     setLoading(true);
     startProgress();
     try {
-      const systemPrompt = `You are a visual director. Generate EXACTLY 60 visual prompts based on the script.
+      const systemPrompt = `You are a visual director. Generate EXACTLY 35 visual prompts based on the script.
       
       CRITICAL INSTRUCTION: You MUST output ONLY the scenes. Do not include any conversational text. Start directly with "1.".
-      DO NOT be lazy. You MUST output the full text, including all boilerplate paragraphs, for ALL 60 scenes.
+      DO NOT be lazy. You MUST output the full text, including all boilerplate paragraphs, for ALL 35 scenes.
       
       Every single scene MUST follow this exact multi-paragraph template:
 
@@ -357,14 +274,13 @@ The door is about to open. It always does.`);
       [Camera Composition - NOTE: POV / first-person view from the character's perspective is acceptable and encouraged when appropriate], [Location], [Time Period], [Time of Day (Optional)], [Architectural/Environmental Details (Optional)]. 
       Clean cinematic minimalist prehistoric illustration style, simplified digital cartoon aesthetic, soft cel shading, muted earthy palette, atmospheric firelight, uncluttered composition, sharp polished vector-like rendering, modern explainer-animation look, simple geometric environments.
 
-      [MANDATORY INCLUSION - YOU MUST COPY AND PASTE THIS EXACT PARAGRAPH INTO EVERY SINGLE PROMPT REGARDLESS OF SCENE CONTENT:]
       All characters should have a minimalist cinematic cartoon character design with oversized smooth circular heads, tiny oval black eyes, simple mouth lines, clean back outlines, soft cel shading, simplified anatomy, rounded limbs, modern explainer-animation aesthetic, subtle fabric folds, muted/desaturated color palette, polished digital illustration, clean vector-like appearance, atmospheric lighting, uncluttered design.
 
-      [MANDATORY INCLUSION - YOU MUST INCLUDE THESE EXACT SECTIONS IN EVERY SINGLE PROMPT REGARDLESS OF CHARACTER PRESENCE:]
+      [IF THE MAIN CHARACTER IS IN THE SCENE, YOU MUST EXPLICITLY INCLUDE THIS EXACT TEXT. IF THE MAIN CHARACTER IS NOT IN THE SCENE, DO NOT INCLUDE THIS:]
       Main Character: ${characterRef}
-      Main Character Consistency: Pure [Color] skin tone and [Body Size] body size. (NOTE: Replace [Color] with ONE specific descriptive color and [Body Size] with ONE specific body size, and use these exact words for all 60 prompts).
-      Main Character Outfit Consistency: [Describe the character's outfit consistency for this scene].
-      Main Character Action: [Explicitly describe the specific actions the Main Character is performing in this scene].
+      Main Character Consistency: Skin color and body size remains EXACTLY the same.
+      [Main Character Outfit Consistency]
+      Main Character Action: [Explicitly describe the specific actions the Main Character is performing in this scene]
 
       [IF BACKGROUND CHARACTERS ARE NEEDED FOR THE SCENE, YOU MUST EXPLICITLY INCLUDE THIS EXACT TEXT IN THE PROMPT:]
       Background Characters should follow the exact same character design language and anatomy proportions as the Main Character, but vary in clothing, hairstyle, body shapes, age, accessories, and facial expressions. Include men, women, elderly people, children, workers, soldiers, merchants, peasants, nobles, etc depending on the setting and time period. Maintain the same minimalist rounded-head aesthetic and clean cinematic illustration style. 
@@ -386,7 +302,7 @@ The door is about to open. It always does.`);
           return { script: "Audio sync reference not found.", prompt: block.replace(/SCRIPT:[\s\S]*?PROMPT:/i, '').trim() };
         });
 
-      setImagePrompts(parsedPrompts.slice(0, 60));
+      setImagePrompts(parsedPrompts.slice(0, 35));
       
       completeProgress();
       setTimeout(() => {
@@ -429,48 +345,16 @@ The door is about to open. It always does.`);
     document.body.removeChild(textArea);
   };
 
-  // --- Image Gen Workflow ---
-
-  const generateSingleImage = async (index) => {
-    setImageLoadingStates(prev => ({ ...prev, [index]: true }));
-    try {
-      const url = await callImageModel(imagePrompts[index].prompt);
-      setGeneratedImages(prev => ({ ...prev, [index]: url }));
-    } catch (e) {
-      alert(`Scene ${index + 1} Failed: ${e.message}`);
-    } finally {
-      setImageLoadingStates(prev => ({ ...prev, [index]: false }));
-    }
-  };
-
-  const generateAllImages = async () => {
-    setBatchGenLoading(true);
-    for (let i = 0; i < imagePrompts.length; i++) {
-      if (generatedImages[i]) continue; // Skip existing
-      await generateSingleImage(i);
-    }
-    setBatchGenLoading(false);
-  };
-
-  const downloadImage = (url, index) => {
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `scene-${index + 1}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   // --- UI Components ---
   const BackButton = ({ onClick }) => (
-    <button onClick={onClick} disabled={loading} className="mb-6 flex items-center gap-2 text-sm font-bold text-slate-400 hover:text-indigo-600 transition-colors uppercase tracking-wider shrink-0">
+    <button onClick={onClick} disabled={loading} className="mb-6 flex items-center gap-2 text-sm font-bold text-slate-400 hover:text-indigo-600 transition-colors uppercase tracking-wider">
       <ArrowLeft size={16} /> Back
     </button>
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans p-4 md:p-8 flex flex-col">
-      <header className="max-w-6xl mx-auto w-full flex items-center justify-between mb-8 shrink-0">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans p-4 md:p-8">
+      <header className="max-w-6xl mx-auto flex items-center justify-between mb-12">
         <div className="flex items-center gap-3">
           <div className="bg-indigo-600 p-2 rounded-xl text-white"><Clapperboard size={28} /></div>
           <h1 className="text-2xl font-black tracking-tight uppercase italic">DozeZen<span className="text-indigo-600">Workflow</span></h1>
@@ -481,9 +365,9 @@ The door is about to open. It always does.`);
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto w-full bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0">
+      <main className="max-w-5xl mx-auto bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden min-h-[600px]">
         {step === 1 && (
-          <div className="p-8 overflow-y-auto">
+          <div className="p-8">
             <h2 className="text-2xl font-bold mb-6">Source Content</h2>
             <div className="grid md:grid-cols-2 gap-8">
               <div className="space-y-4">
@@ -533,7 +417,7 @@ The door is about to open. It always does.`);
         )}
 
         {step === 2 && (
-          <div className="p-8 max-w-3xl mx-auto overflow-y-auto text-center flex flex-col justify-center min-h-[600px]">
+          <div className="p-8 max-w-3xl mx-auto">
             <BackButton onClick={() => setStep(1)} />
             <h2 className="text-2xl font-bold mb-8">Character Engine</h2>
             <div className="space-y-6">
@@ -559,73 +443,50 @@ The door is about to open. It always does.`);
                 )}
               </div>
 
-              <div className="flex flex-col gap-3">
-                <button onClick={analyzeAndGenerate} disabled={loading} className="w-full py-6 bg-indigo-600 text-white rounded-2xl font-black text-lg hover:bg-indigo-700 flex items-center justify-center gap-3 transition-all active:scale-[0.98] relative overflow-hidden">
-                  {loading && <div className="absolute left-0 top-0 bottom-0 bg-indigo-800 transition-all duration-300 z-0" style={{ width: `${genProgress}%` }} />}
-                  <span className="relative z-10 flex items-center justify-center gap-3">
-                    {loading ? <Loader2 className="animate-spin" /> : <Settings size={28} />} 
-                    {loading ? `Processing... ${Math.round(genProgress)}%` : 'Run Full AI Workflow'}
-                  </span>
-                </button>
-
-                {generatedScript && !loading && (
-                  <button 
-                    onClick={() => setStep(3)} 
-                    className="w-full py-4 bg-slate-100 text-slate-700 rounded-2xl font-bold hover:bg-slate-200 transition-colors flex items-center justify-center gap-2"
-                  >
-                    Continue to Generated Content <ArrowLeft className="rotate-180" size={18} />
-                  </button>
-                )}
-              </div>
+              <button onClick={analyzeAndGenerate} disabled={loading} className="w-full py-6 bg-indigo-600 text-white rounded-2xl font-black text-lg hover:bg-indigo-700 flex items-center justify-center gap-3 transition-all active:scale-[0.98] relative overflow-hidden">
+                {loading && <div className="absolute left-0 top-0 bottom-0 bg-indigo-800 transition-all duration-300 z-0" style={{ width: `${genProgress}%` }} />}
+                <span className="relative z-10 flex items-center justify-center gap-3">
+                  {loading ? <Loader2 className="animate-spin" /> : <Settings size={28} />} 
+                  {loading ? `Processing... ${Math.round(genProgress)}%` : 'Run Full AI Workflow'}
+                </span>
+              </button>
             </div>
           </div>
         )}
 
         {step === 3 && (
-          <div className="p-8 overflow-y-auto flex flex-col h-full">
-            <BackButton onClick={() => setStep(2)} />
+          <div className="p-8">
             <div className="flex justify-between items-center mb-8">
                <h2 className="text-2xl font-bold">3. Generated Content & Metadata</h2>
-               <div className="flex gap-3">
-                 <button 
-                  onClick={engineerPrompts} 
-                  disabled={loading}
-                  className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-all active:scale-[0.98] disabled:opacity-50 relative overflow-hidden"
-                 >
-                   {loading && <div className="absolute left-0 top-0 bottom-0 bg-indigo-800 transition-all duration-300 z-0" style={{ width: `${genProgress}%` }} />}
-                   <span className="relative z-10 flex items-center justify-center gap-2">
-                     {loading ? <Loader2 size={18} className="animate-spin" /> : <FileText size={18} />}
-                     {loading ? `Generating ${Math.round(genProgress)}%` : 'Generate Visual Prompts'}
-                   </span>
-                 </button>
-
-                 {imagePrompts.length > 0 && !loading && (
-                   <button 
-                    onClick={() => setStep(4)}
-                    className="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-black transition-all active:scale-[0.98]"
-                   >
-                     Next: Visual Queue <ArrowLeft size={18} className="rotate-180" />
-                   </button>
-                 )}
-               </div>
+               <button 
+                onClick={engineerPrompts} 
+                disabled={loading}
+                className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-all active:scale-[0.98] disabled:opacity-50 relative overflow-hidden"
+               >
+                 {loading && <div className="absolute left-0 top-0 bottom-0 bg-indigo-800 transition-all duration-300 z-0" style={{ width: `${genProgress}%` }} />}
+                 <span className="relative z-10 flex items-center justify-center gap-2">
+                   {loading ? <Loader2 size={18} className="animate-spin" /> : <FileText size={18} />}
+                   {loading ? `Generating ${Math.round(genProgress)}%` : 'Generate Visual Prompts'}
+                 </span>
+               </button>
             </div>
             
-            <div className="grid lg:grid-cols-2 gap-8 flex-1 min-h-0 overflow-hidden">
-              <div className="flex flex-col h-full">
+            <div className="grid lg:grid-cols-2 gap-8">
+              <div>
                 <div className="flex justify-between items-center gap-2 mb-2 text-slate-400 uppercase font-black text-[10px] tracking-widest">
                   <span className="flex items-center gap-2"><FileText size={14} /> Production Script</span>
                   <a href="https://elevenlabs.io/app/home" target="_blank" rel="noopener noreferrer" className="text-indigo-500 hover:text-indigo-700 normal-case tracking-normal">Generate TTS on ElevenLabs</a>
                 </div>
-                <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100 whitespace-pre-wrap flex-1 overflow-y-auto leading-relaxed font-serif text-lg custom-scrollbar">
+                <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100 whitespace-pre-wrap h-[500px] overflow-y-auto leading-relaxed font-serif text-lg">
                   {generatedScript}
                 </div>
               </div>
               
-              <div className="flex flex-col h-full">
+              <div>
                 <div className="flex items-center gap-2 mb-2 text-slate-400 uppercase font-black text-[10px] tracking-widest">
                   <Video size={14} /> Optimized Video Description
                 </div>
-                <div className="bg-indigo-50/30 p-8 rounded-3xl border border-indigo-100 whitespace-pre-wrap flex-1 overflow-y-auto leading-relaxed font-sans text-sm text-slate-700 shadow-inner custom-scrollbar">
+                <div className="bg-indigo-50/30 p-8 rounded-3xl border border-indigo-100 whitespace-pre-wrap h-[500px] overflow-y-auto leading-relaxed font-sans text-sm text-slate-700 shadow-inner">
                   {generatedVideoDescription || "Analysis complete. Script generated above. Description metadata processing failed, please check source input."}
                 </div>
               </div>
@@ -634,116 +495,31 @@ The door is about to open. It always does.`);
         )}
 
         {step === 4 && (
-          <div className="p-8 flex flex-col h-full min-h-0">
-            <BackButton onClick={() => setStep(3)} />
-            <div className="flex justify-between items-center mb-8 shrink-0">
+          <div className="p-8">
+            <div className="flex justify-between items-center mb-8">
               <h2 className="text-2xl font-bold">4. Visual Prompt Queue ({imagePrompts.length} Scenes)</h2>
-              <button onClick={() => setStep(5)} className="bg-indigo-600 text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors shadow-lg active:scale-95 flex items-center gap-2">
-                Open Image Studio <Sparkles size={18} />
-              </button>
+              <a href="https://higgsfield.ai/" target="_blank" rel="noopener noreferrer" className="bg-slate-900 text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-black transition-colors shadow-lg active:scale-95">
+                Generate Images on Higgsfield.ai
+              </a>
             </div>
             
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 flex-1 min-h-0 overflow-hidden">
-              <div className="lg:col-span-4 flex flex-col h-full bg-slate-50 rounded-3xl p-6 border border-slate-200">
-                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2 shrink-0">
-                  <FileText size={14} /> Full Production Script
-                </h3>
-                <div className="flex-1 overflow-y-auto pr-2 font-serif text-sm leading-relaxed text-slate-700 whitespace-pre-wrap pb-8 custom-scrollbar">
-                  {generatedScript}
-                </div>
-              </div>
-
-              <div className="lg:col-span-8 overflow-y-auto pr-4 space-y-6 pb-20 custom-scrollbar">
-                {imagePrompts.map((scene, i) => (
-                  <div key={i} className="p-6 bg-slate-50 rounded-2xl border border-slate-200 relative group transition-colors hover:border-indigo-300">
-                    <button onClick={() => copyPrompt(typeof scene === 'string' ? scene : scene.prompt, i)} className="absolute top-4 right-4 p-2 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-indigo-50 hover:text-indigo-600 transition-colors z-20">
-                      {copiedIndex === i ? <CheckCircle size={16} className="text-green-600" /> : <Copy size={16} />}
-                    </button>
-                    <p className="text-xs font-bold text-indigo-600 mb-4 uppercase tracking-widest">Scene {i+1}</p>
-                    
-                    <div className="grid grid-cols-1 gap-4">
-                      {typeof scene === 'object' && scene.script && (
-                        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col">
-                           <span className="text-[10px] font-black uppercase text-slate-400 block mb-2 border-b border-slate-50 pb-1">Audio Script Match</span>
-                           <span className="text-base text-slate-800 font-serif leading-relaxed line-clamp-none whitespace-pre-wrap italic">"{scene.script}"</span>
-                        </div>
-                      )}
-                      
-                      <div className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap font-mono bg-indigo-50/50 p-4 rounded-xl border border-indigo-100/50">
-                        {typeof scene === 'string' ? scene : scene.prompt}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {step === 5 && (
-          <div className="p-8 flex flex-col h-full min-h-0">
-            <div className="flex justify-between items-center mb-8 shrink-0">
-              <div className="flex items-center gap-4">
-                <BackButton onClick={() => setStep(4)} />
-                <h2 className="text-2xl font-bold">5. Image Production Studio</h2>
-              </div>
-              <button 
-                onClick={generateAllImages} 
-                disabled={batchGenLoading}
-                className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-all active:scale-[0.98] disabled:opacity-50"
-              >
-                {batchGenLoading ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
-                {batchGenLoading ? 'Generating Batch...' : 'Generate All Images'}
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 flex-1 min-h-0 overflow-y-auto pr-4 pb-12 custom-scrollbar">
+            <div className="grid grid-cols-1 gap-4 max-h-[600px] overflow-y-auto pr-4">
               {imagePrompts.map((scene, i) => (
-                <div key={i} className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden flex flex-col shadow-sm h-fit">
-                  <div className="aspect-video bg-slate-200 relative flex items-center justify-center border-b border-slate-200 overflow-hidden">
-                    {generatedImages[i] ? (
-                      <img src={generatedImages[i]} alt={`Scene ${i+1}`} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="flex flex-col items-center gap-2 text-slate-400">
-                        {imageLoadingStates[i] ? (
-                          <Loader2 size={32} className="animate-spin text-indigo-500" />
-                        ) : (
-                          <ImageIcon size={32} />
-                        )}
-                        <span className="text-[10px] font-bold uppercase tracking-widest">
-                          {imageLoadingStates[i] ? 'Drawing Scene...' : 'Ready to Render'}
-                        </span>
-                      </div>
-                    )}
-                  </div>
+                <div key={i} className="p-6 bg-slate-50 rounded-2xl border border-slate-200 relative group transition-colors hover:border-indigo-300">
+                  <button onClick={() => copyPrompt(typeof scene === 'string' ? scene : scene.prompt, i)} className="absolute top-4 right-4 p-2 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-indigo-50 hover:text-indigo-600 transition-colors">
+                    {copiedIndex === i ? <CheckCircle size={16} className="text-green-600" /> : <Copy size={16} />}
+                  </button>
+                  <p className="text-xs font-bold text-indigo-600 mb-2 uppercase tracking-widest">Scene {i+1}</p>
                   
-                  <div className="p-4 flex-1 flex flex-col">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-xs font-black text-indigo-600 uppercase tracking-widest">Scene {i+1}</span>
-                      <div className="flex gap-2">
-                        <button 
-                          onClick={() => generateSingleImage(i)}
-                          disabled={imageLoadingStates[i]}
-                          className="p-1.5 bg-white border border-slate-200 rounded-lg hover:bg-indigo-50 hover:text-indigo-600 transition-colors shadow-sm disabled:opacity-50"
-                          title={generatedImages[i] ? "Regenerate Image" : "Generate Image"}
-                        >
-                          <RefreshCw size={14} className={imageLoadingStates[i] ? 'animate-spin' : ''} />
-                        </button>
-                        
-                        {generatedImages[i] && (
-                          <button 
-                            onClick={() => downloadImage(generatedImages[i], i)}
-                            className="p-1.5 bg-white border border-slate-200 rounded-lg hover:bg-indigo-50 hover:text-indigo-600 transition-colors shadow-sm"
-                            title="Download PNG"
-                          >
-                            <Download size={14} />
-                          </button>
-                        )}
-                      </div>
+                  {typeof scene === 'object' && scene.script && (
+                    <div className="mb-4 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                       <span className="text-[10px] font-black uppercase text-slate-400 block mb-1">Audio Script Match</span>
+                       <span className="text-sm text-slate-800 font-serif leading-relaxed">"{scene.script}"</span>
                     </div>
-                    <p className="text-[10px] text-slate-500 line-clamp-3 italic font-serif leading-relaxed border-t border-slate-100 pt-2">
-                      "{scene.script}"
-                    </p>
+                  )}
+                  
+                  <div className="text-sm text-slate-700 leading-relaxed pr-10 whitespace-pre-wrap font-mono bg-indigo-50/50 p-4 rounded-lg border border-indigo-100/50 italic">
+                    {typeof scene === 'string' ? scene : scene.prompt}
                   </div>
                 </div>
               ))}
@@ -751,22 +527,6 @@ The door is about to open. It always does.`);
           </div>
         )}
       </main>
-
-      <style dangerouslySetInnerHTML={{ __html: `
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 6px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #e2e8f0;
-          border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #cbd5e1;
-        }
-      `}} />
     </div>
   );
 };
