@@ -1,15 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { 
   FileText, 
   Settings, 
   Image as ImageIcon, 
-  Download, 
   CheckCircle, 
   Loader2, 
   Clapperboard, 
   ArrowLeft, 
   Trash2, 
-  AlertCircle, 
   Copy,
   Lock,
   Key,
@@ -18,10 +16,10 @@ import {
 } from 'lucide-react';
 
 // --- API Configuration ---
-const TEXT_MODEL = "gemini-3.1-pro-preview"; 
-const IMAGE_MODEL = "gemini-3.1-pro-preview"; 
+const TEXT_MODEL = "gemini-3-flash-preview"; 
+const IMAGE_MODEL = "gemini-3.1-flash-image-preview"; 
 
-export default function App() {
+function App() {
   const [apiKey, setApiKey] = useState("");
   const [hasKey, setHasKey] = useState(false);
   const [step, setStep] = useState(0); 
@@ -32,7 +30,7 @@ export default function App() {
   const [sourceVideoTitle, setSourceVideoTitle] = useState("");
   const [sourceDescription, setSourceDescription] = useState(""); 
   const [additionalDetails, setAdditionalDetails] = useState("");
-  const [transcript, setTranscript] = useState(``);
+  const [transcript, setTranscript] = useState("");
   
   // Generated Content States
   const [generatedScript, setGeneratedScript] = useState("");
@@ -114,21 +112,20 @@ export default function App() {
     setLoading(true);
     try {
       const systemPrompt = `You are a content strategist and scriptwriter. 
-      TASK 1: Analyze the provided transcript and source description. Write a new script for a video titled "${videoTitle}" matching the source tone. Target 8-minute length.
-      TASK 2: Write a compelling YouTube video description for the new video. Use the style of the "Source Description" provided. 
-      DESCRIPTION STRUCTURE:
+      TASK 1: Analyze transcript/source. Write a script for "${videoTitle}" matching source tone. Target 8-min.
+      TASK 2: Write a YouTube description based on "Source Description". 
+      STRUCTURE:
       1. Hook & Summary
-      2. Key Talking Points
-      3. [SOURCES] section citing relevant research and source materials
-      4. [KEYWORDS] section with relevant hashtags
+      2. Key Points
+      3. [SOURCES] section (Citations)
+      4. [KEYWORDS] section (Hashtags)
       
-      CRITICAL: Place citations BEFORE hashtags.
-      Format the output with clear dividers: ---SCRIPT START--- and ---DESCRIPTION START---`;
+      CRITICAL: Citations MUST come before Hashtags.
+      Format with: ---SCRIPT START--- and ---DESCRIPTION START---`;
 
-      const userPrompt = `Target Title: ${videoTitle}\n\nSource Title: ${sourceVideoTitle}\n\nSource Description: ${sourceDescription}\n\nSource Transcript: ${transcript}\n\nAdditional Details: ${additionalDetails}`;
+      const userPrompt = `Target Title: ${videoTitle}\nSource Title: ${sourceVideoTitle}\nSource Description: ${sourceDescription}\nSource Transcript: ${transcript}\nAdditional Details: ${additionalDetails}`;
       
       const response = await callGemini(userPrompt, systemPrompt);
-      
       const scriptMatch = response.match(/---SCRIPT START---([\s\S]*?)---DESCRIPTION START---/);
       const descMatch = response.match(/---DESCRIPTION START---([\s\S]*)/);
       
@@ -138,7 +135,6 @@ export default function App() {
       } else {
         setGeneratedScript(response); 
       }
-      
       setStep(3);
     } catch (e) {
       alert(`Workflow Failed:\n${e.message}`);
@@ -150,9 +146,10 @@ export default function App() {
   const engineerPrompts = async () => {
     setLoading(true);
     try {
-      const systemPrompt = `You are a visual director. Generate EXACTLY 35 visual prompts for this script. 
+      const systemPrompt = `You are a visual director. Generate EXACTLY 35 visual prompts. 
+      OUTPUT ONLY THE PROMPTS. Start directly with "1.".
       
-      FOR EVERY PROMPT, YOU MUST INCLUDE THIS EXACT BOILERPLATE STYLE TEXT:
+      EVERY PROMPT MUST FOLLOW THIS EXACT TEMPLATE:
       [Camera Composition], [Location], [Time Period], [Time of Day (Optional)], [Architectural/Environmental Details (Optional)]. 
       Clean cinematic minimalist prehistoric illustration style, simplified digital cartoon aesthetic, soft cel shading, muted earthy palette, atmospheric firelight, uncluttered composition, sharp polished vector-like rendering, modern explainer-animation look, simple geometric environments.
       
@@ -163,8 +160,8 @@ export default function App() {
       [Main Character Outfit Consistency]
       [Actions of main Character]
 
-      IF background characters are needed for the scene, you MUST explicitly include this EXACT text in the prompt:
-      "Background Characters should follow the exact same character design language and anatomy proportions as the Main Character, but vary in clothing, hairstyle, body shapes, age, accessories, and facial expressions. Include men, women, elderly people, children, workers, soldiers, merchants, peasants, nobles, etc depending on the setting and time period. Maintain the same minimalist rounded-head aesthetic and clean cinematic illustration style. 
+      IF background characters are in the scene, add:
+      "[Appropriate #] Background Characters. Background Characters should follow the exact same character design language and anatomy proportions as the Main Character, but vary in clothing, hairstyle, body shapes, age, accessories, and facial expressions. Include men, women, elderly people, children, workers, soldiers, merchants, peasants, nobles, etc depending on the setting and time period. Maintain the same minimalist rounded-head aesthetic and clean cinematic illustration style. 
       [Actions of Background Characters]"`;
 
       const result = await callGemini(`Script: ${generatedScript}`, systemPrompt);
@@ -229,22 +226,12 @@ export default function App() {
       <main className="max-w-6xl mx-auto bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden min-h-[600px]">
         {step === 0 && (
           <div className="p-12 max-w-md mx-auto text-center">
-            <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
-              <Key size={32} />
-            </div>
+            <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6"><Key size={32} /></div>
             <h2 className="text-2xl font-bold mb-2">Secure Setup</h2>
-            <p className="text-slate-500 text-sm mb-8">To keep your account safe, enter your Gemini API key below. It is stored locally in your browser and never saved to GitHub.</p>
+            <p className="text-slate-500 text-sm mb-8">Enter your Gemini API key. It is stored locally in your browser session.</p>
             <form onSubmit={handleApiKeySubmit} className="space-y-4">
-              <input 
-                type="password" 
-                placeholder="Enter API Key (AIza...)" 
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                className="w-full p-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-center font-mono"
-              />
-              <button type="submit" className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all">
-                Access Workflow
-              </button>
+              <input type="password" placeholder="Enter API Key (AIza...)" value={apiKey} onChange={(e) => setApiKey(e.target.value)} className="w-full p-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-center font-mono" />
+              <button type="submit" className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all">Access Workflow</button>
             </form>
           </div>
         )}
@@ -255,42 +242,21 @@ export default function App() {
             <div className="grid lg:grid-cols-3 gap-8">
               <div className="space-y-6">
                 <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100">
-                  <div className="flex items-center gap-2 mb-4 text-indigo-600">
-                    <FileText size={18} />
-                    <h3 className="font-bold uppercase tracking-widest text-xs">New Project Identity</h3>
-                  </div>
-                  <label className="block text-[10px] font-black text-slate-400 mb-1 uppercase tracking-tighter">Your Video Title</label>
-                  <input type="text" value={videoTitle} onChange={(e) => setVideoTitle(e.target.value)} placeholder="Enter video title..." className="w-full bg-white p-3 rounded-xl border border-slate-200 shadow-sm outline-none mb-4" />
-                  <label className="block text-[10px] font-black text-slate-400 mb-1 uppercase tracking-tighter">Additional Narrative Nuances</label>
-                  <textarea value={additionalDetails} onChange={(e) => setAdditionalDetails(e.target.value)} placeholder="Facts to include, tone tweaks..." className="w-full bg-white p-3 rounded-xl border border-slate-200 shadow-sm outline-none h-24 resize-none text-sm" />
+                  <div className="flex items-center gap-2 mb-4 text-indigo-600"><FileText size={18} /><h3 className="font-bold uppercase tracking-widest text-xs">New Project</h3></div>
+                  <input type="text" value={videoTitle} onChange={(e) => setVideoTitle(e.target.value)} placeholder="Your Video Title" className="w-full bg-white p-3 rounded-xl border border-slate-200 mb-4" />
+                  <textarea value={additionalDetails} onChange={(e) => setAdditionalDetails(e.target.value)} placeholder="Additional Nuances..." className="w-full bg-white p-3 rounded-xl border border-slate-200 h-24 resize-none text-sm" />
                 </div>
               </div>
-
               <div className="space-y-6">
                 <div className="p-6 bg-indigo-50/50 rounded-2xl border border-indigo-100">
-                  <div className="flex items-center gap-2 mb-4 text-indigo-600">
-                    <Youtube size={18} />
-                    <h3 className="font-bold uppercase tracking-widest text-xs">Source Reference</h3>
-                  </div>
-                  <label className="block text-[10px] font-black text-indigo-400 mb-1 uppercase tracking-tighter">Source Title</label>
-                  <input type="text" placeholder="Title of the video you're emulating..." value={sourceVideoTitle} onChange={(e) => setSourceVideoTitle(e.target.value)} className="w-full bg-white p-3 rounded-xl border border-slate-200 outline-none mb-4 text-sm" />
-                  <label className="block text-[10px] font-black text-indigo-400 mb-1 uppercase tracking-tighter">Source Video Description</label>
-                  <textarea value={sourceDescription} onChange={(e) => setSourceDescription(e.target.value)} placeholder="Paste the description of the YouTube video here..." className="w-full bg-white p-3 rounded-xl border border-slate-200 outline-none h-44 resize-none text-sm" />
-                  <p className="text-[10px] text-indigo-400 mt-2 italic font-medium leading-tight flex gap-2">
-                    <Info size={12} className="shrink-0" />
-                    AI will mirror this formatting, including citations and keyword placements.
-                  </p>
+                  <div className="flex items-center gap-2 mb-4 text-indigo-600"><Youtube size={18} /><h3 className="font-bold uppercase tracking-widest text-xs">Source Reference</h3></div>
+                  <input type="text" placeholder="Source Title" value={sourceVideoTitle} onChange={(e) => setSourceVideoTitle(e.target.value)} className="w-full bg-white p-3 rounded-xl border border-slate-200 mb-4 text-sm" />
+                  <textarea value={sourceDescription} onChange={(e) => setSourceDescription(e.target.value)} placeholder="Paste Source YouTube Description..." className="w-full bg-white p-3 rounded-xl border border-slate-200 h-44 resize-none text-sm" />
                 </div>
               </div>
-
               <div className="flex flex-col gap-4">
-                <div className="flex-1 flex flex-col">
-                  <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-tighter px-2">Knowledge Base / Transcript</label>
-                  <textarea value={transcript} onChange={(e) => setTranscript(e.target.value)} placeholder="Paste the transcript or core knowledge base here..." className="flex-1 w-full bg-slate-50 p-4 rounded-2xl border border-slate-200 outline-none resize-none min-h-[300px] text-sm font-mono" />
-                </div>
-                <button onClick={() => setStep(2)} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-black transition-all flex items-center justify-center gap-2">
-                   Configure Assets <ArrowLeft className="rotate-180" size={18} />
-                </button>
+                <textarea value={transcript} onChange={(e) => setTranscript(e.target.value)} placeholder="Paste Transcript here..." className="flex-1 w-full bg-slate-50 p-4 rounded-2xl border border-slate-200 outline-none resize-none min-h-[300px] text-sm font-mono" />
+                <button onClick={() => setStep(2)} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold flex items-center justify-center gap-2">Configure Assets <ArrowLeft className="rotate-180" size={18} /></button>
               </div>
             </div>
           </div>
@@ -301,27 +267,21 @@ export default function App() {
             <BackButton onClick={() => setStep(1)} />
             <h2 className="text-2xl font-bold mb-8">2. Visual Consistency</h2>
             <div className="space-y-6">
-              <label className="block text-[10px] font-black text-slate-400 mb-1 uppercase tracking-widest">Master Character Description</label>
               <textarea value={characterRef} onChange={(e) => setCharacterRef(e.target.value)} className="w-full p-4 rounded-xl bg-slate-50 border border-slate-200 h-32 text-sm outline-none" />
-              
               <div className="flex flex-col items-center gap-4">
                 <label className="w-full border-2 border-dashed border-slate-200 rounded-xl p-8 text-center cursor-pointer hover:bg-slate-50 transition-colors">
                   <ImageIcon className="mx-auto mb-2 text-slate-400" />
-                  <span className="text-sm font-medium text-slate-600">Upload Character Reference Sheet (Optional)</span>
+                  <span className="text-sm font-medium text-slate-600">Upload Character Sheet</span>
                   <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
                 </label>
-
                 {characterImageBase64 && (
                   <div className="relative group w-40 h-40 rounded-xl overflow-hidden border border-slate-200 shadow-xl ring-4 ring-indigo-50">
                     <img src={characterImageBase64.previewUrl} alt="Reference" className="w-full h-full object-cover" />
-                    <button onClick={() => setCharacterImageBase64(null)} className="absolute top-2 right-2 bg-white/90 rounded-full p-2 text-red-500 hover:bg-red-600 hover:text-white transition-all">
-                      <Trash2 size={16}/>
-                    </button>
+                    <button onClick={() => setCharacterImageBase64(null)} className="absolute top-2 right-2 bg-white/90 rounded-full p-2 text-red-500 transition-all"><Trash2 size={16}/></button>
                   </div>
                 )}
               </div>
-
-              <button onClick={analyzeAndGenerate} disabled={loading} className="w-full py-6 bg-indigo-600 text-white rounded-2xl font-black text-xl hover:bg-indigo-700 flex items-center justify-center gap-3 transition-all active:scale-[0.98]">
+              <button onClick={analyzeAndGenerate} disabled={loading} className="w-full py-6 bg-indigo-600 text-white rounded-2xl font-black text-xl hover:bg-indigo-700 flex items-center justify-center gap-3">
                 {loading ? <Loader2 className="animate-spin" /> : <Settings size={28} />} Run Full AI Workflow
               </button>
             </div>
@@ -332,28 +292,18 @@ export default function App() {
           <div className="p-8">
             <div className="flex justify-between items-center mb-8">
                <h2 className="text-2xl font-bold">3. Generated Content</h2>
-               <button onClick={engineerPrompts} disabled={loading} className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-all active:scale-[0.98]">
+               <button onClick={engineerPrompts} disabled={loading} className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2">
                  {loading ? <Loader2 size={18} className="animate-spin" /> : <FileText size={18} />} Generate Visual Prompts
                </button>
             </div>
-            
             <div className="grid lg:grid-cols-2 gap-8">
               <div>
-                <div className="flex items-center gap-2 mb-2 text-slate-400 uppercase font-black text-[10px] tracking-widest">
-                  <FileText size={14} /> Production Script
-                </div>
-                <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100 whitespace-pre-wrap h-[500px] overflow-y-auto leading-relaxed font-serif text-lg">
-                  {generatedScript}
-                </div>
+                <div className="flex items-center gap-2 mb-2 text-slate-400 uppercase font-black text-[10px] tracking-widest"><FileText size={14} /> Production Script</div>
+                <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100 whitespace-pre-wrap h-[500px] overflow-y-auto font-serif text-lg">{generatedScript}</div>
               </div>
-              
               <div>
-                <div className="flex items-center gap-2 mb-2 text-slate-400 uppercase font-black text-[10px] tracking-widest">
-                  <Youtube size={14} /> Video Description & SEO
-                </div>
-                <div className="bg-indigo-50/30 p-8 rounded-3xl border border-indigo-100 whitespace-pre-wrap h-[500px] overflow-y-auto leading-relaxed font-sans text-sm text-slate-700 shadow-inner">
-                  {generatedVideoDescription || "Description generation failed. Script generated successfully."}
-                </div>
+                <div className="flex items-center gap-2 mb-2 text-slate-400 uppercase font-black text-[10px] tracking-widest"><Youtube size={14} /> Video Description</div>
+                <div className="bg-indigo-50/30 p-8 rounded-3xl border border-indigo-100 whitespace-pre-wrap h-[500px] overflow-y-auto text-sm text-slate-700 shadow-inner">{generatedVideoDescription}</div>
               </div>
             </div>
           </div>
@@ -364,25 +314,20 @@ export default function App() {
             <h2 className="text-2xl font-bold mb-8">4. Visual Prompt Queue (35 Scenes)</h2>
             <div className="grid grid-cols-1 gap-4 max-h-[600px] overflow-y-auto pr-4">
               {imagePrompts.map((p, i) => (
-                <div key={i} className="p-6 bg-slate-50 rounded-2xl border border-slate-200 relative group transition-all hover:border-indigo-300">
-                  <button onClick={() => copyPrompt(p, i)} className="absolute top-4 right-4 p-2 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition-all">
+                <div key={i} className="p-6 bg-slate-50 rounded-2xl border border-slate-200 relative group">
+                  <button onClick={() => copyPrompt(p, i)} className="absolute top-4 right-4 p-2 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-indigo-50 transition-all">
                     {copiedIndex === i ? <CheckCircle size={16} className="text-green-600" /> : <Copy size={16} />}
                   </button>
-                  <p className="text-xs font-bold text-indigo-600 mb-2 uppercase tracking-widest">Scene {i+1}</p>
-                  <div className="text-sm text-slate-700 leading-relaxed pr-12 whitespace-pre-wrap font-mono bg-white/50 p-4 rounded-lg border border-slate-100 italic">
-                    {p}
-                  </div>
+                  <p className="text-xs font-bold text-indigo-600 mb-2 uppercase">Scene {i+1}</p>
+                  <div className="text-sm text-slate-700 leading-relaxed pr-12 whitespace-pre-wrap font-mono bg-white/50 p-4 rounded-lg border border-slate-100 italic">{p}</div>
                 </div>
               ))}
             </div>
           </div>
         )}
       </main>
-      
-      <footer className="max-w-6xl mx-auto mt-8 flex justify-between items-center text-[10px] font-black text-slate-400 uppercase tracking-widest">
-        <span>Character Engine v3.1</span>
-        <span>Secure Session Encryption Enabled</span>
-      </footer>
     </div>
   );
 }
+
+export default App;
