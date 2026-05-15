@@ -12,12 +12,12 @@ import {
   Lock,
   Key,
   Info,
-  Youtube
+  Video
 } from 'lucide-react';
 
 // --- API Configuration ---
-const TEXT_MODEL = "gemini-3-flash-preview"; 
-const IMAGE_MODEL = "gemini-3.1-flash-image-preview"; 
+const TEXT_MODEL = "gemini-3.1-pro-preview"; 
+const IMAGE_MODEL = "gemini-3.1-pro-preview"; 
 
 function App() {
   const [apiKey, setApiKey] = useState("");
@@ -149,7 +149,7 @@ function App() {
       const systemPrompt = `You are a visual director. Generate EXACTLY 35 visual prompts. 
       OUTPUT ONLY THE PROMPTS. Start directly with "1.".
       
-      EVERY PROMPT MUST FOLLOW THIS EXACT TEMPLATE:
+      EVERY PROMPT MUST FOLLOW THIS EXACT MULTI-PARAGRAPH TEMPLATE:
       [Camera Composition], [Location], [Time Period], [Time of Day (Optional)], [Architectural/Environmental Details (Optional)]. 
       Clean cinematic minimalist prehistoric illustration style, simplified digital cartoon aesthetic, soft cel shading, muted earthy palette, atmospheric firelight, uncluttered composition, sharp polished vector-like rendering, modern explainer-animation look, simple geometric environments.
       
@@ -160,8 +160,8 @@ function App() {
       [Main Character Outfit Consistency]
       [Actions of main Character]
 
-      IF background characters are in the scene, add:
-      "[Appropriate #] Background Characters. Background Characters should follow the exact same character design language and anatomy proportions as the Main Character, but vary in clothing, hairstyle, body shapes, age, accessories, and facial expressions. Include men, women, elderly people, children, workers, soldiers, merchants, peasants, nobles, etc depending on the setting and time period. Maintain the same minimalist rounded-head aesthetic and clean cinematic illustration style. 
+      IF background characters are needed for the scene, you MUST explicitly include this EXACT text in the prompt:
+      "Background Characters should follow the exact same character design language and anatomy proportions as the Main Character, but vary in clothing, hairstyle, body shapes, age, accessories, and facial expressions. Include men, women, elderly people, children, workers, soldiers, merchants, peasants, nobles, etc depending on the setting and time period. Maintain the same minimalist rounded-head aesthetic and clean cinematic illustration style. 
       [Actions of Background Characters]"`;
 
       const result = await callGemini(`Script: ${generatedScript}`, systemPrompt);
@@ -249,7 +249,7 @@ function App() {
               </div>
               <div className="space-y-6">
                 <div className="p-6 bg-indigo-50/50 rounded-2xl border border-indigo-100">
-                  <div className="flex items-center gap-2 mb-4 text-indigo-600"><Youtube size={18} /><h3 className="font-bold uppercase tracking-widest text-xs">Source Reference</h3></div>
+                  <div className="flex items-center gap-2 mb-4 text-indigo-600"><Video size={18} /><h3 className="font-bold uppercase tracking-widest text-xs">Source Reference</h3></div>
                   <input type="text" placeholder="Source Title" value={sourceVideoTitle} onChange={(e) => setSourceVideoTitle(e.target.value)} className="w-full bg-white p-3 rounded-xl border border-slate-200 mb-4 text-sm" />
                   <textarea value={sourceDescription} onChange={(e) => setSourceDescription(e.target.value)} placeholder="Paste Source YouTube Description..." className="w-full bg-white p-3 rounded-xl border border-slate-200 h-44 resize-none text-sm" />
                 </div>
@@ -302,7 +302,7 @@ function App() {
                 <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100 whitespace-pre-wrap h-[500px] overflow-y-auto font-serif text-lg">{generatedScript}</div>
               </div>
               <div>
-                <div className="flex items-center gap-2 mb-2 text-slate-400 uppercase font-black text-[10px] tracking-widest"><Youtube size={14} /> Video Description</div>
+                <div className="flex items-center gap-2 mb-2 text-slate-400 uppercase font-black text-[10px] tracking-widest"><Video size={14} /> Video Description</div>
                 <div className="bg-indigo-50/30 p-8 rounded-3xl border border-indigo-100 whitespace-pre-wrap h-[500px] overflow-y-auto text-sm text-slate-700 shadow-inner">{generatedVideoDescription}</div>
               </div>
             </div>
