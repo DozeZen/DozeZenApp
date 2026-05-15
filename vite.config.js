@@ -7,5 +7,5 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
-  base: '/DozeZenApp/',
+  base: process.env.NODE_ENV === 'production' ? '/DozeZenApp/' : '/',
 })
