@@ -18,11 +18,10 @@ import {
 } from 'lucide-react';
 
 // --- API Configuration ---
-// Models: Requested Gemini 3 series experimental strings
 const TEXT_MODEL = "gemini-3.1-pro-preview"; 
 const IMAGE_MODEL = "gemini-3.1-pro-preview"; 
 
-const App = () => {
+export default function App() {
   const [apiKey, setApiKey] = useState("");
   const [hasKey, setHasKey] = useState(false);
   const [step, setStep] = useState(0); 
@@ -31,7 +30,7 @@ const App = () => {
   // Input States
   const [videoTitle, setVideoTitle] = useState("");
   const [sourceVideoTitle, setSourceVideoTitle] = useState("");
-  const [sourceDescription, setSourceDescription] = useState(""); // New field
+  const [sourceDescription, setSourceDescription] = useState(""); 
   const [additionalDetails, setAdditionalDetails] = useState("");
   const [transcript, setTranscript] = useState(``);
   
@@ -130,7 +129,6 @@ const App = () => {
       
       const response = await callGemini(userPrompt, systemPrompt);
       
-      // Parse output
       const scriptMatch = response.match(/---SCRIPT START---([\s\S]*?)---DESCRIPTION START---/);
       const descMatch = response.match(/---DESCRIPTION START---([\s\S]*)/);
       
@@ -138,7 +136,7 @@ const App = () => {
         setGeneratedScript(scriptMatch[1].trim());
         setGeneratedVideoDescription(descMatch[1].trim());
       } else {
-        setGeneratedScript(response); // Fallback
+        setGeneratedScript(response); 
       }
       
       setStep(3);
@@ -165,8 +163,9 @@ const App = () => {
       [Main Character Outfit Consistency]
       [Actions of main Character]
 
-      Background Characters should follow the exact same character design language and anatomy proportions as the Main Character, but vary in clothing, hairstyle, body shapes, age, accessories, and facial expressions. Include men, women, elderly people, children, workers, soldiers, merchants, peasants, nobles, etc depending on the setting and time period. Maintain the same minimalist rounded-head aesthetic and clean cinematic illustration style. 
-      [Actions of Background Characters]`;
+      IF background characters are needed for the scene, you MUST explicitly include this EXACT text in the prompt:
+      "Background Characters should follow the exact same character design language and anatomy proportions as the Main Character, but vary in clothing, hairstyle, body shapes, age, accessories, and facial expressions. Include men, women, elderly people, children, workers, soldiers, merchants, peasants, nobles, etc depending on the setting and time period. Maintain the same minimalist rounded-head aesthetic and clean cinematic illustration style. 
+      [Actions of Background Characters]"`;
 
       const result = await callGemini(`Script: ${generatedScript}`, systemPrompt);
       const lines = result.split(/\n\d+\.|\d+\./);
@@ -228,7 +227,6 @@ const App = () => {
       </header>
 
       <main className="max-w-6xl mx-auto bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden min-h-[600px]">
-        {/* Step 0: Secure API Key Entry */}
         {step === 0 && (
           <div className="p-12 max-w-md mx-auto text-center">
             <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
@@ -251,13 +249,10 @@ const App = () => {
           </div>
         )}
 
-        {/* Step 1: Source Content */}
         {step === 1 && (
           <div className="p-8">
             <h2 className="text-2xl font-bold mb-8">1. Intelligence Ingestion</h2>
             <div className="grid lg:grid-cols-3 gap-8">
-              
-              {/* Left Column: Your Targets */}
               <div className="space-y-6">
                 <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100">
                   <div className="flex items-center gap-2 mb-4 text-indigo-600">
@@ -266,13 +261,11 @@ const App = () => {
                   </div>
                   <label className="block text-[10px] font-black text-slate-400 mb-1 uppercase tracking-tighter">Your Video Title</label>
                   <input type="text" value={videoTitle} onChange={(e) => setVideoTitle(e.target.value)} placeholder="Enter video title..." className="w-full bg-white p-3 rounded-xl border border-slate-200 shadow-sm outline-none mb-4" />
-                  
                   <label className="block text-[10px] font-black text-slate-400 mb-1 uppercase tracking-tighter">Additional Narrative Nuances</label>
                   <textarea value={additionalDetails} onChange={(e) => setAdditionalDetails(e.target.value)} placeholder="Facts to include, tone tweaks..." className="w-full bg-white p-3 rounded-xl border border-slate-200 shadow-sm outline-none h-24 resize-none text-sm" />
                 </div>
               </div>
 
-              {/* Middle Column: Competitive Intelligence */}
               <div className="space-y-6">
                 <div className="p-6 bg-indigo-50/50 rounded-2xl border border-indigo-100">
                   <div className="flex items-center gap-2 mb-4 text-indigo-600">
@@ -281,7 +274,6 @@ const App = () => {
                   </div>
                   <label className="block text-[10px] font-black text-indigo-400 mb-1 uppercase tracking-tighter">Source Title</label>
                   <input type="text" placeholder="Title of the video you're emulating..." value={sourceVideoTitle} onChange={(e) => setSourceVideoTitle(e.target.value)} className="w-full bg-white p-3 rounded-xl border border-slate-200 outline-none mb-4 text-sm" />
-                  
                   <label className="block text-[10px] font-black text-indigo-400 mb-1 uppercase tracking-tighter">Source Video Description</label>
                   <textarea value={sourceDescription} onChange={(e) => setSourceDescription(e.target.value)} placeholder="Paste the description of the YouTube video here..." className="w-full bg-white p-3 rounded-xl border border-slate-200 outline-none h-44 resize-none text-sm" />
                   <p className="text-[10px] text-indigo-400 mt-2 italic font-medium leading-tight flex gap-2">
@@ -291,7 +283,6 @@ const App = () => {
                 </div>
               </div>
 
-              {/* Right Column: Knowledge Base */}
               <div className="flex flex-col gap-4">
                 <div className="flex-1 flex flex-col">
                   <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-tighter px-2">Knowledge Base / Transcript</label>
@@ -394,6 +385,4 @@ const App = () => {
       </footer>
     </div>
   );
-};
-
-export default App;
+}
