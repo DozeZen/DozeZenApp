@@ -17,87 +17,21 @@ import {
   RefreshCw,
   Tag,
   Play,
-  Star,
-  Save,
-  FolderOpen,
-  Key,
-  X
+  Star
 } from 'lucide-react';
 
-// --- Firebase Imports ---
-import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, doc, setDoc, collection, onSnapshot, deleteDoc, serverTimestamp } from 'firebase/firestore';
-
 // --- API Configuration ---
-const apiKey = ""; // Leave empty for Canvas environment proxy to work!
+const apiKey = "AIzaSyCSqjaoIQ2xoIfP5_pWIcMFElquqhnPdwI"; // Set by environment
 const TEXT_MODEL = "gemini-3.1-pro-preview"; 
 const IMAGE_GEN_MODEL = "imagen-4.0-generate-001"; 
 const IMAGE_REF_MODEL = "gemini-2.5-flash-image";
-
-// --- Firebase Initialization ---
-let app, auth, db;
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'dozezen-app';
-
-try {
-  let configObj = null;
-  // 1. Try Canvas injected config (Works here in this environment)
-  if (typeof __firebase_config !== 'undefined' && __firebase_config) {
-    configObj = typeof __firebase_config === 'string' ? JSON.parse(__firebase_config) : __firebase_config;
-  } 
-  // 2. Hardcoded Config
-  else {
-    configObj = {
-      apiKey: "AIzaSyBd3RJNXltu_CxRtjiU25pk_S0oItzUbBU",
-      authDomain: "dozezen-3faf3.firebaseapp.com",
-      projectId: "dozezen-3faf3",
-      storageBucket: "dozezen-3faf3.firebasestorage.app",
-      messagingSenderId: "307885983458",
-      appId: "1:307885983458:web:7d8b994d122b9622d540bb"
-    };
-  }
-
-  // Only initialize if the config is actually filled out (prevents errors if left as default placeholder)
-  if (configObj && configObj.apiKey && configObj.apiKey !== "YOUR_API_KEY") {
-    app = initializeApp(configObj);
-    auth = getAuth(app);
-    db = getFirestore(app);
-  }
-} catch (e) {
-  console.error("Firebase init failed. Please check your config.", e);
-}
 
 const App = () => {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   
-  // Auth & Cloud State
-  const [user, setUser] = useState(null);
-  const [savedProjects, setSavedProjects] = useState([]);
-  const [showProjectsModal, setShowProjectsModal] = useState(false);
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [customApiKey, setCustomApiKey] = useState(() => localStorage.getItem("dozezen_api_key") || "");
-  
-  // Persist API Key to Browser Local Storage
-  useEffect(() => {
-    if (customApiKey) {
-      localStorage.setItem("dozezen_api_key", customApiKey);
-    } else {
-      localStorage.removeItem("dozezen_api_key");
-    }
-  }, [customApiKey]);
-
   // Input States
-  const fallbackTitles = [
-    "What did Ancient Humans Do At Night?",
-    "Why Do Modern Humans Fear the Dark?",
-    "Who was the First Human That Discovered Fire?",
-    "Humans Used To Walk on All Fours: The True Story",
-    "The Terrifying Reason We Are The Last Human Species Alive"
-  ];
-  const [videoTitle, setVideoTitle] = useState(() => fallbackTitles[Math.floor(Math.random() * fallbackTitles.length)]);
-  const [topicLoading, setTopicLoading] = useState(false);
-  
+  const [videoTitle, setVideoTitle] = useState("");
   const [sourceVideoTitle, setSourceVideoTitle] = useState("POV: You Are a Billionaire at 25 | What It ACTUALLY Feels Like?");
   const [sourceDescription, setSourceDescription] = useState(`You thought becoming rich would change everything.
 It didn’t.
@@ -133,7 +67,7 @@ Were you ever trying to get rich?
 Or just trying to fix something that money can’t touch?
 
 ________________________________________#POV #Wealth #Billionaire #MoneyPsychology #FinanceExpl #Success`);
-  const [additionalDetails, setAdditionalDetails] = useState("Include elements that are educational or informative. The script should be between 700-900 words long.");
+  const [additionalDetails, setAdditionalDetails] = useState("");
   const [transcript, setTranscript] = useState(`Part one, the kitchen table. You grow up in a house where money is not discussed because there is nothing to discuss. This is Gary, Indiana, 2001. Your father drives a forklift at a steel distribution center, days only because the night shift pays more and he bid for it three times and lost three times to men with more seniority and less reason to care. Your mother works the front desk at a dental office she will never be able to afford as a patient. She brings home the sample toothbrushes.
 
 That is the extent of the dental benefit. You share a bedroom with your younger sister until you are 13. The wall between your room and the kitchen is thin enough that you hear the bills being sorted on Friday nights. The specific sound of envelopes being stac ked by urgency, which is a skill your parents developed without anyone teaching them. You are not poor enough for anyone to notice. That's the particular cruelty of your kind of broke. Not homeless. Not hungry. Not
@@ -203,7 +137,7 @@ The door is about to open. It always does.`);
   const [characterRef, setCharacterRef] = useState("Young adult male, wearing outfit that is appropriate for the setting and time period, no hair, neutral expression, slightly slimmer build, calm personality, recognizable protagonist design.");
   const [characterImageBase64, setCharacterImageBase64] = useState(null);
   const [imagePrompts, setImagePrompts] = useState([]);
-  const [copiedType, setCopiedType] = useState(null);
+  const [copiedIndex, setCopiedIndex] = useState(null);
   const [genProgress, setGenProgress] = useState(0); 
   const progressInterval = useRef(null);
 
@@ -212,166 +146,6 @@ The door is about to open. It always does.`);
   const [imageLoadingStates, setImageLoadingStates] = useState({});
   const [batchGenLoading, setBatchGenLoading] = useState(false);
 
-  // --- Auto-Load Reference Image from public folder ---
-  useEffect(() => {
-    const img = new Image();
-    img.crossOrigin = "Anonymous";
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const targetRatio = 16 / 9;
-      const imgRatio = img.width / img.height;
-
-      let canvasWidth = img.width;
-      let canvasHeight = img.height;
-
-      if (imgRatio < targetRatio) {
-        canvasWidth = img.height * targetRatio;
-      } else {
-        canvasHeight = img.width / targetRatio;
-      }
-
-      // Cap the resolution to keep Base64 small enough for Firestore saving
-      const MAX_WIDTH = 800;
-      if (canvasWidth > MAX_WIDTH) {
-         canvasHeight = Math.round(MAX_WIDTH / targetRatio);
-         canvasWidth = MAX_WIDTH;
-      }
-
-      canvas.width = canvasWidth;
-      canvas.height = canvasHeight;
-      const ctx = canvas.getContext('2d');
-      
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-      
-      // Draw image centered and scaled down if needed
-      let drawWidth = img.width;
-      let drawHeight = img.height;
-      if (imgRatio < targetRatio && drawHeight > canvasHeight) {
-          drawHeight = canvasHeight;
-          drawWidth = drawHeight * imgRatio;
-      } else if (imgRatio >= targetRatio && drawWidth > canvasWidth) {
-          drawWidth = canvasWidth;
-          drawHeight = drawWidth / imgRatio;
-      }
-
-      const x = (canvasWidth - drawWidth) / 2;
-      const y = (canvasHeight - drawHeight) / 2;
-      ctx.drawImage(img, x, y, drawWidth, drawHeight);
-
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-      const base64String = dataUrl.split(',')[1];
-      
-      setCharacterImageBase64({
-        mimeType: 'image/jpeg',
-        data: base64String,
-        previewUrl: dataUrl
-      });
-    };
-    img.onerror = () => {
-      console.warn("Could not auto-load /reference.png. Please ensure the file is in your public directory or upload manually.");
-    };
-    img.src = '/reference.png';
-  }, []);
-
-  // --- Firebase Auth & Projects Fetching ---
-  useEffect(() => {
-    if (!auth) return;
-    const initAuth = async () => {
-      try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
-      } catch (e) {
-        console.error("Auth Error:", e);
-      }
-    };
-    initAuth();
-    
-    const unsubscribe = onAuthStateChanged(auth, setUser);
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (!user || !db) return;
-    const projectsRef = collection(db, 'artifacts', appId, 'users', user.uid, 'projects');
-    const unsubscribe = onSnapshot(projectsRef, (snapshot) => {
-      const projects = [];
-      snapshot.forEach(doc => projects.push({ id: doc.id, ...doc.data() }));
-      // Sort in memory as per rules
-      projects.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-      setSavedProjects(projects);
-    }, (error) => {
-      console.error("Projects sync error:", error);
-    });
-    return () => unsubscribe();
-  }, [user]);
-
-  const saveProjectToCloud = async () => {
-    if (!user || !db) return alert("Cloud save unavailable. Please make sure you have added your hardcoded Firebase Config keys in App.jsx.");
-    setLoading(true);
-    try {
-      const projectId = videoTitle.trim() ? videoTitle.replace(/[^a-z0-9]/gi, '-').toLowerCase() : `project-${Date.now()}`;
-      const projectRef = doc(db, 'artifacts', appId, 'users', user.uid, 'projects', projectId);
-      
-      const payload = {
-        videoTitle,
-        sourceVideoTitle,
-        sourceDescription,
-        additionalDetails,
-        transcript: transcript.substring(0, 5000), // Cap size to ensure it fits in Firestore
-        generatedScript,
-        generatedVideoDescription,
-        generatedTags,
-        characterRef,
-        characterImageBase64, // Reduced size via canvas
-        imagePrompts,
-        updatedAt: Date.now()
-      };
-      
-      await setDoc(projectRef, payload);
-      alert("Project saved successfully!");
-    } catch (e) {
-      alert("Error saving project: " + e.message);
-    }
-    setLoading(false);
-  };
-
-  const loadProject = (project) => {
-    setVideoTitle(project.videoTitle || "");
-    setSourceVideoTitle(project.sourceVideoTitle || "");
-    setSourceDescription(project.sourceDescription || "");
-    setAdditionalDetails(project.additionalDetails || "");
-    setTranscript(project.transcript || "");
-    setGeneratedScript(project.generatedScript || "");
-    setGeneratedVideoDescription(project.generatedVideoDescription || "");
-    setGeneratedTags(project.generatedTags || "");
-    setCharacterRef(project.characterRef || "");
-    setCharacterImageBase64(project.characterImageBase64 || null);
-    setImagePrompts(project.imagePrompts || []);
-    setShowProjectsModal(false);
-    
-    if (project.imagePrompts && project.imagePrompts.length > 0) {
-      setStep(4);
-    } else if (project.generatedScript) {
-      setStep(3);
-    } else {
-      setStep(1);
-    }
-  };
-
-  const deleteProject = async (projectId) => {
-    if (!user || !db) return;
-    try {
-      await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'projects', projectId));
-    } catch (e) {
-      console.error("Delete failed:", e);
-    }
-  };
-
-  // --- Utility Functions ---
   const startProgress = () => {
     setGenProgress(0);
     progressInterval.current = setInterval(() => {
@@ -384,26 +158,10 @@ The door is about to open. It always does.`);
     setGenProgress(100);
   };
 
-  const copyToClipboard = (text, type) => {
-    const textArea = document.createElement("textarea");
-    textArea.value = text;
-    document.body.appendChild(textArea);
-    textArea.select();
-    document.execCommand('copy');
-    document.body.removeChild(textArea);
-    setCopiedType(type);
-    setTimeout(() => setCopiedType(null), 2000);
-  };
-
-  const getActiveApiKey = () => {
-    return customApiKey || apiKey;
-  };
-
   // --- API Utilities ---
   const callGemini = async (prompt, systemInstruction = "", useSearch = false, imageData = null) => {
     let retries = 0;
     const maxRetries = 5;
-    const activeKey = getActiveApiKey();
     
     while (retries <= maxRetries) {
       try {
@@ -426,9 +184,7 @@ The door is about to open. It always does.`);
           payload.systemInstruction = { parts: [{ text: systemInstruction }] };
         }
 
-        // Use public text model (gemini-3.1-pro-preview) instead of image model when an active key is provided
-        const modelToUse = activeKey ? "gemini-3.1-pro-preview" : TEXT_MODEL;
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${activeKey}`;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${TEXT_MODEL}:generateContent?key=${apiKey}`;
 
         const response = await fetch(url, {
           method: 'POST',
@@ -464,15 +220,9 @@ The door is about to open. It always does.`);
   const callImageModel = async (promptText) => {
     let retries = 0;
     const maxRetries = 5;
-    const activeKey = getActiveApiKey();
     
     const isImageToImage = characterImageBase64 && characterImageBase64.data;
-    let modelToUse = isImageToImage ? IMAGE_REF_MODEL : IMAGE_GEN_MODEL;
-    
-    // Use public models if a custom API key is provided, otherwise use Canvas preview models
-    if (activeKey) {
-        modelToUse = isImageToImage ? "gemini-2.5-flash-image" : "imagen-4.0-generate-001";
-    }
+    const modelToUse = isImageToImage ? IMAGE_REF_MODEL : IMAGE_GEN_MODEL;
     
     while (retries <= maxRetries) {
       try {
@@ -494,7 +244,7 @@ The door is about to open. It always does.`);
             }
           };
           
-          response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${activeKey}`, {
+          response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -511,7 +261,7 @@ The door is about to open. It always does.`);
           return `data:image/png;base64,${base64}`;
           
         } else {
-          response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:predict?key=${activeKey}`, {
+          response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:predict?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -532,7 +282,7 @@ The door is about to open. It always does.`);
           return `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`;
         }
       } catch (e) {
-        if (e.message.includes("API Key") || e.message.includes("401") || e.message.includes("404")) throw e;
+        if (e.message.includes("401") || e.message.includes("404")) throw e;
         if (retries === maxRetries) throw e;
         await new Promise(r => setTimeout(r, Math.pow(2, retries) * 1000));
         retries++;
@@ -541,28 +291,6 @@ The door is about to open. It always does.`);
   };
 
   // --- Workflow Logic ---
-
-  const generateTrendingTopic = async () => {
-    setTopicLoading(true);
-    try {
-      const prompt = "Act as an expert YouTube strategist. Research current viral trends in the 'History', 'Anthropology', and 'Human Evolution' niches. Generate exactly ONE highly engaging, click-optimized YouTube video title that has high viral potential right now. Return ONLY the title text, nothing else. Do not use quotes.";
-      
-      let freshTitle;
-      try {
-        // Try with Search enabled first (if your API tier supports it)
-        freshTitle = await callGemini(prompt, "", true); 
-      } catch (searchError) {
-        // Fallback: If Search is blocked (400 error), use the model's internal brain
-        console.warn("Search tool unavailable, using internal model knowledge instead.");
-        freshTitle = await callGemini(prompt, "", false); 
-      }
-
-      setVideoTitle(freshTitle.replace(/^["']|["']$/g, "").trim());
-    } catch (e) {
-      alert("Could not research topic: " + e.message);
-    }
-    setTopicLoading(false);
-  };
 
   const analyzeAndGenerate = async () => {
     setLoading(true);
@@ -577,61 +305,41 @@ The door is about to open. It always does.`);
       - Create a completely fresh, unique narrative structure from scratch.
       - Write in a conversational, raw, human tone. 
       - AVOID all standard AI-sounding cliches (e.g., "in a world where", "delve into", "a testament to", "let's explore", etc.).
-      - The script must be PLAIN SPOKEN TEXT ONLY. Do not include any production cues, stage directions, speaker names, or bracketed instructions.
+      - The script must be PLAIN SPOKEN TEXT ONLY. Do not include any production cues, stage directions, speaker names, or bracketed instructions. The output must be ready to be pasted directly into a text-to-speech generator.
       
       TASK 2: Write a compelling YouTube Video Description for this video by analyzing the "Source Description" provided. 
       DESCRIPTION REQUIREMENTS:
       - Match the tone and formatting style of the Source Description.
       - Include an engaging hook and concise summary.
       - List key talking points or timestamps.
-      - ESSENTIAL: Include a [SOURCES] section with relevant citations BEFORE the hashtag keyword section.
+      - ESSENTIAL: Include a [SOURCES] section with relevant citations.
+      - ESSENTIAL: Place citations BEFORE the hashtag keyword section.
       
-      TASK 3: Generate a list of highly optimized, SEO-friendly YouTube tags based on the new script. Output them strictly as a comma-separated list.
+      TASK 3: Generate a list of highly optimized, SEO-friendly YouTube tags based on the new script. Ensure they are highly relevant search terms. Output them strictly as a comma-separated list.
 
-      MANDATORY OUTPUT FORMAT:
-      You MUST wrap your three distinct sections in the following exact XML tags. Do not output anything outside of these tags.
-      
-      <SCRIPT>
-      [Your full script here]
-      </SCRIPT>
-      <DESCRIPTION>
-      [Your full video description here]
-      </DESCRIPTION>
-      <TAGS>
-      [Your comma-separated tags here]
-      </TAGS>`;
+      Format your response with the following markers:
+      ---SCRIPT---
+      [Spoken content here]
+      ---DESCRIPTION---
+      [Description content here]
+      ---TAGS---
+      [Comma-separated tags here]`;
       
       let userPrompt = `Target Title: ${videoTitle}\nSource Title: ${sourceVideoTitle}\nSource Description: ${sourceDescription}\nSource Transcript: ${transcript}\nAdditional Details: ${additionalDetails}`;
       
       const response = await callGemini(userPrompt, systemPrompt);
       
-      // Highly robust XML Parsing Logic
-      const scriptMatch = response.match(/<SCRIPT>([\s\S]*?)<\/SCRIPT>/i);
-      const descMatch = response.match(/<DESCRIPTION>([\s\S]*?)<\/DESCRIPTION>/i);
-      const tagsMatch = response.match(/<TAGS>([\s\S]*?)<\/TAGS>/i);
+      const scriptMatch = response.match(/---SCRIPT---([\s\S]*?)(?=---DESCRIPTION---|$)/);
+      const descMatch = response.match(/---DESCRIPTION---([\s\S]*?)(?=---TAGS---|$)/);
+      const tagsMatch = response.match(/---TAGS---([\s\S]*)/);
       
-      let scriptText = scriptMatch ? scriptMatch[1].trim() : "";
-      let descText = descMatch ? descMatch[1].trim() : "";
-      let tagsText = tagsMatch ? tagsMatch[1].trim() : "";
-
-      // Ultimate Fallback: Just in case the AI ignores XML and tries old format or markdown
-      if (!scriptText && !descText && !tagsText) {
-        const altScriptMatch = response.match(/---SCRIPT---([\s\S]*?)(?=---DESCRIPTION---|$)/i) || response.match(/SCRIPT:?\s*\n([\s\S]*?)(?=DESCRIPTION:?\s*\n|$)/i);
-        const altDescMatch = response.match(/---DESCRIPTION---([\s\S]*?)(?=---TAGS---|$)/i) || response.match(/DESCRIPTION:?\s*\n([\s\S]*?)(?=TAGS:?\s*\n|$)/i);
-        const altTagsMatch = response.match(/---TAGS---([\s\S]*)/i) || response.match(/TAGS:?\s*\n([\s\S]*)/i);
-
-        scriptText = altScriptMatch ? altScriptMatch[1].trim() : "";
-        descText = altDescMatch ? altDescMatch[1].trim() : "";
-        tagsText = altTagsMatch ? altTagsMatch[1].trim() : "";
-
-        if (!scriptText && !descText && !tagsText) {
-             scriptText = response; // Dump entire raw response if total formatting failure
-        }
+      if (scriptMatch) setGeneratedScript(scriptMatch[1].trim());
+      if (descMatch) setGeneratedVideoDescription(descMatch[1].trim());
+      if (tagsMatch) setGeneratedTags(tagsMatch[1].trim());
+      
+      if (!scriptMatch && !descMatch && !tagsMatch) {
+        setGeneratedScript(response);
       }
-      
-      setGeneratedScript(scriptText);
-      setGeneratedVideoDescription(descText);
-      setGeneratedTags(tagsText);
       
       completeProgress();
       setTimeout(() => {
@@ -769,13 +477,6 @@ The door is about to open. It always does.`);
             canvasHeight = img.width / targetRatio;
           }
 
-          // Cap the resolution to keep Base64 small enough for Firestore saving
-          const MAX_WIDTH = 800;
-          if (canvasWidth > MAX_WIDTH) {
-             canvasHeight = Math.round(MAX_WIDTH / targetRatio);
-             canvasWidth = MAX_WIDTH;
-          }
-
           canvas.width = canvasWidth;
           canvas.height = canvasHeight;
           const ctx = canvas.getContext('2d');
@@ -783,22 +484,11 @@ The door is about to open. It always does.`);
           ctx.fillStyle = '#FFFFFF';
           ctx.fillRect(0, 0, canvasWidth, canvasHeight);
           
-          // Draw image centered and scaled down if needed
-          let drawWidth = img.width;
-          let drawHeight = img.height;
-          if (imgRatio < targetRatio && drawHeight > canvasHeight) {
-              drawHeight = canvasHeight;
-              drawWidth = drawHeight * imgRatio;
-          } else if (imgRatio >= targetRatio && drawWidth > canvasWidth) {
-              drawWidth = canvasWidth;
-              drawHeight = drawWidth / imgRatio;
-          }
+          const x = (canvasWidth - img.width) / 2;
+          const y = (canvasHeight - img.height) / 2;
+          ctx.drawImage(img, x, y);
 
-          const x = (canvasWidth - drawWidth) / 2;
-          const y = (canvasHeight - drawHeight) / 2;
-          ctx.drawImage(img, x, y, drawWidth, drawHeight);
-
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
           const base64String = dataUrl.split(',')[1];
           
           setCharacterImageBase64({
@@ -811,6 +501,17 @@ The door is about to open. It always does.`);
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const copyPrompt = (text, index) => {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    document.body.appendChild(textArea);
+    textArea.select();
+    document.execCommand('copy');
+    setCopiedIndex(index);
+    setTimeout(() => setCopiedIndex(null), 2000);
+    document.body.removeChild(textArea);
   };
 
   // --- Image Gen Workflow ---
@@ -846,102 +547,69 @@ The door is about to open. It always does.`);
     document.body.removeChild(link);
   };
 
-  const downloadAllImages = () => {
-    const readyIndexes = imagePrompts.map((_, i) => i).filter(i => generatedImages[i]);
-    if (readyIndexes.length === 0) return alert("No images generated yet!");
-    
-    // Stagger downloads to prevent browser from blocking them as popup spam
-    readyIndexes.forEach((index, queueOrder) => {
-      setTimeout(() => {
-        downloadImage(generatedImages[index], index);
-      }, queueOrder * 350); 
-    });
-  };
-
   // --- UI Components ---
-  const BackButton = ({ onClick, className = "" }) => (
-    <button onClick={onClick} disabled={loading || batchGenLoading} className={`flex items-center gap-2 text-sm font-bold text-slate-400 hover:text-indigo-600 transition-colors uppercase tracking-wider shrink-0 disabled:opacity-50 ${className}`}>
+  const BackButton = ({ onClick }) => (
+    <button onClick={onClick} disabled={loading || batchGenLoading} className="mb-6 flex items-center gap-2 text-sm font-bold text-slate-400 hover:text-indigo-600 transition-colors uppercase tracking-wider shrink-0 disabled:opacity-50">
       <ArrowLeft size={16} /> Back
     </button>
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans p-4 md:p-8 flex flex-col relative">
-      <header className="max-w-6xl mx-auto w-full flex items-center justify-between mb-6 sm:mb-8 shrink-0">
-        <div className="flex items-center gap-2 sm:gap-3">
-          <div className="bg-indigo-600 p-1.5 sm:p-2 rounded-xl text-white"><Clapperboard className="w-5 h-5 sm:w-7 sm:h-7" /></div>
-          <h1 className="text-lg sm:text-2xl font-black tracking-tight uppercase italic hidden sm:block">DozeZen<span className="text-indigo-600">Workflow</span></h1>
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans p-4 md:p-8 flex flex-col">
+      <header className="max-w-6xl mx-auto w-full flex items-center justify-between mb-8 shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="bg-indigo-600 p-2 rounded-xl text-white"><Clapperboard size={28} /></div>
+          <h1 className="text-2xl font-black tracking-tight uppercase italic">DozeZen<span className="text-indigo-600">Workflow</span></h1>
         </div>
-        
-        <div className="flex items-center gap-2 sm:gap-4">
-          <button 
-            onClick={() => setShowProjectsModal(true)}
-            className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-bold text-slate-600 bg-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl border border-slate-200 hover:bg-indigo-50 hover:text-indigo-600 transition-colors shadow-sm"
-          >
-            <FolderOpen size={16} className="w-4 h-4 sm:w-5 sm:h-5" /> <span className="hidden sm:inline">My Projects</span><span className="sm:hidden">Projects</span>
-          </button>
-          <button 
-            onClick={() => setShowSettingsModal(true)}
-            className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-bold text-slate-600 bg-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl border border-slate-200 hover:bg-slate-100 transition-colors shadow-sm"
-          >
-            <Settings size={16} className="w-4 h-4 sm:w-5 sm:h-5" /> <span className="hidden sm:inline">Settings</span>
-          </button>
+        <div className="text-xs text-slate-400 font-bold uppercase tracking-widest text-right">
+          Gemini Beta Mode<br/>
+          <span className="text-[10px] text-slate-300">Strict Character Consistency Engine</span>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto w-full bg-white rounded-2xl sm:rounded-3xl shadow-xl border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0">
+      <main className="max-w-7xl mx-auto w-full bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0">
         {step === 1 && (
-          <div className="p-4 sm:p-8 overflow-y-auto h-full">
-            <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Source Content</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+          <div className="p-8 overflow-y-auto">
+            <h2 className="text-2xl font-bold mb-6">Source Content</h2>
+            <div className="grid md:grid-cols-2 gap-8">
               <div className="space-y-4">
-                <div className="p-4 sm:p-6 bg-slate-50 rounded-2xl border border-slate-100">
-                  <h3 className="font-bold text-slate-900 mb-2 uppercase text-[10px] sm:text-xs tracking-widest text-indigo-600">New Video Target</h3>
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-2 gap-2">
-                    <label className="block text-[10px] font-black text-slate-400 uppercase">Video Title</label>
-                    <button 
-                      onClick={generateTrendingTopic} 
-                      disabled={topicLoading}
-                      className="text-[10px] text-indigo-500 hover:text-indigo-700 font-bold flex items-center gap-1 transition-colors disabled:opacity-50 w-full sm:w-auto justify-start sm:justify-end"
-                    >
-                      {topicLoading ? <Loader2 size={12} className="animate-spin"/> : <Sparkles size={12}/>} 
-                      {topicLoading ? 'Researching...' : 'AI Research Topic'}
-                    </button>
-                  </div>
-                  <input type="text" value={videoTitle} onChange={(e) => setVideoTitle(e.target.value)} className="w-full bg-white p-3 rounded-xl border border-slate-200 shadow-sm outline-none mb-4 text-xs sm:text-sm font-semibold text-slate-800" />
+                <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100">
+                  <h3 className="font-bold text-slate-900 mb-2 uppercase text-xs tracking-widest text-indigo-600">New Video Target</h3>
+                  <label className="block text-[10px] font-black text-slate-400 mb-1 uppercase">Video Title</label>
+                  <input type="text" value={videoTitle} onChange={(e) => setVideoTitle(e.target.value)} className="w-full bg-white p-3 rounded-xl border border-slate-200 shadow-sm outline-none mb-4 text-sm" />
                   
                   <label className="block text-[10px] font-black text-slate-400 mb-1 uppercase">Additional Instructions</label>
-                  <textarea value={additionalDetails} onChange={(e) => setAdditionalDetails(e.target.value)} className="w-full bg-white p-3 rounded-xl border border-slate-200 shadow-sm outline-none h-32 resize-none text-xs sm:text-sm" />
+                  <textarea value={additionalDetails} onChange={(e) => setAdditionalDetails(e.target.value)} className="w-full bg-white p-3 rounded-xl border border-slate-200 shadow-sm outline-none h-32 resize-none text-sm" />
                 </div>
               </div>
               
               <div className="space-y-4">
-                <div className="p-4 sm:p-6 bg-indigo-50/50 rounded-2xl border border-indigo-100">
+                <div className="p-6 bg-indigo-50/50 rounded-2xl border border-indigo-100">
                   <div className="flex items-center gap-2 mb-3 text-indigo-600">
-                    <Video size={18} className="w-4 h-4 sm:w-5 sm:h-5" />
-                    <h3 className="font-bold text-[10px] sm:text-xs uppercase tracking-widest">Competitive Reference</h3>
+                    <Video size={18} />
+                    <h3 className="font-bold text-xs uppercase tracking-widest">Competitive Reference</h3>
                   </div>
                   <label className="block text-[10px] font-black text-indigo-400 mb-1 uppercase">Source Video Title</label>
-                  <input type="text" value={sourceVideoTitle} onChange={(e) => setSourceVideoTitle(e.target.value)} className="w-full bg-white p-3 rounded-xl border border-slate-200 outline-none mb-4 text-xs sm:text-sm font-medium" />
+                  <input type="text" value={sourceVideoTitle} onChange={(e) => setSourceVideoTitle(e.target.value)} className="w-full bg-white p-3 rounded-xl border border-slate-200 outline-none mb-4 text-sm font-medium" />
                   
                   <label className="block text-[10px] font-black text-indigo-400 mb-1 uppercase">Source Video Description</label>
                   <textarea 
                     value={sourceDescription} 
                     onChange={(e) => setSourceDescription(e.target.value)} 
                     placeholder="Paste the YouTube video description here to mimic style, sources, and keywords..." 
-                    className="w-full bg-white p-3 rounded-xl border border-slate-200 outline-none h-40 resize-none text-xs sm:text-sm leading-relaxed" 
+                    className="w-full bg-white p-3 rounded-xl border border-slate-200 outline-none h-40 resize-none text-sm leading-relaxed" 
                   />
                 </div>
               </div>
 
-              <div className="flex flex-col gap-4 md:col-span-2">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-1 gap-2 px-1">
+              <div className="flex flex-col gap-4">
+                <div className="flex justify-between items-end mb-1 px-1">
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-tighter">Transcript / Primary Research</label>
                   <a href="https://notegpt.io/youtube-transcript-generator" target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-indigo-500 hover:text-indigo-700 flex items-center gap-1 transition-colors">
                     Need Transcript? Get it here.
                   </a>
                 </div>
-                <textarea value={transcript} onChange={(e) => setTranscript(e.target.value)} className="flex-1 bg-slate-50 p-4 rounded-xl border border-slate-200 outline-none resize-none min-h-[300px] font-mono text-[10px] sm:text-xs leading-relaxed" />
+                <textarea value={transcript} onChange={(e) => setTranscript(e.target.value)} className="flex-1 bg-slate-50 p-4 rounded-xl border border-slate-200 outline-none resize-none min-h-[300px] font-mono text-xs leading-relaxed" />
                 <button onClick={() => setStep(2)} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-black transition-colors flex items-center justify-center gap-2">
                   Configure Visuals <ArrowLeft className="rotate-180" size={18} />
                 </button>
@@ -951,16 +619,16 @@ The door is about to open. It always does.`);
         )}
 
         {step === 2 && (
-          <div className="p-4 sm:p-8 max-w-3xl mx-auto overflow-y-auto text-center flex flex-col justify-center min-h-full">
-            <BackButton onClick={() => setStep(1)} className="mb-6" />
-            <h2 className="text-xl sm:text-2xl font-bold mb-6 sm:mb-8">Character Engine</h2>
+          <div className="p-8 max-w-3xl mx-auto overflow-y-auto text-center flex flex-col justify-center min-h-[600px]">
+            <BackButton onClick={() => setStep(1)} />
+            <h2 className="text-2xl font-bold mb-8">Character Engine</h2>
             <div className="space-y-6">
-              <textarea value={characterRef} onChange={(e) => setCharacterRef(e.target.value)} className="w-full p-4 rounded-xl bg-slate-50 border border-slate-200 h-32 text-xs sm:text-sm outline-none leading-relaxed" />
+              <textarea value={characterRef} onChange={(e) => setCharacterRef(e.target.value)} className="w-full p-4 rounded-xl bg-slate-50 border border-slate-200 h-32 text-sm outline-none leading-relaxed" />
               
               <div className="flex flex-col items-center gap-4">
-                <label className="w-full border-2 border-dashed border-slate-200 rounded-xl p-6 sm:p-8 text-center cursor-pointer hover:bg-slate-50 transition-colors">
+                <label className="w-full border-2 border-dashed border-slate-200 rounded-xl p-8 text-center cursor-pointer hover:bg-slate-50 transition-colors">
                   <ImageIcon className="mx-auto mb-2 text-slate-400" />
-                  <span className="text-xs sm:text-sm font-medium text-slate-600">Upload Character Reference Sheet</span>
+                  <span className="text-sm font-medium text-slate-600">Upload Character Reference Sheet</span>
                   <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
                 </label>
 
@@ -978,10 +646,10 @@ The door is about to open. It always does.`);
               </div>
 
               <div className="flex flex-col gap-3">
-                <button onClick={analyzeAndGenerate} disabled={loading} className="w-full py-4 sm:py-6 bg-indigo-600 text-white rounded-2xl font-black text-base sm:text-lg hover:bg-indigo-700 flex items-center justify-center gap-3 transition-all active:scale-[0.98] relative overflow-hidden">
+                <button onClick={analyzeAndGenerate} disabled={loading} className="w-full py-6 bg-indigo-600 text-white rounded-2xl font-black text-lg hover:bg-indigo-700 flex items-center justify-center gap-3 transition-all active:scale-[0.98] relative overflow-hidden">
                   {loading && <div className="absolute left-0 top-0 bottom-0 bg-indigo-800 transition-all duration-300 z-0" style={{ width: `${genProgress}%` }} />}
-                  <span className="relative z-10 flex items-center justify-center gap-2 sm:gap-3">
-                    {loading ? <Loader2 className="animate-spin w-5 h-5 sm:w-7 sm:h-7" /> : <Settings className="w-5 h-5 sm:w-7 sm:h-7" />} 
+                  <span className="relative z-10 flex items-center justify-center gap-3">
+                    {loading ? <Loader2 className="animate-spin" /> : <Settings size={28} />} 
                     {loading ? `Processing... ${Math.round(genProgress)}%` : 'Run Full AI Workflow'}
                   </span>
                 </button>
@@ -989,7 +657,7 @@ The door is about to open. It always does.`);
                 {generatedScript && !loading && (
                   <button 
                     onClick={() => setStep(3)} 
-                    className="w-full py-3 sm:py-4 bg-slate-100 text-slate-700 rounded-2xl font-bold text-sm sm:text-base hover:bg-slate-200 transition-colors flex items-center justify-center gap-2"
+                    className="w-full py-4 bg-slate-100 text-slate-700 rounded-2xl font-bold hover:bg-slate-200 transition-colors flex items-center justify-center gap-2"
                   >
                     Continue to Generated Content <ArrowLeft className="rotate-180" size={18} />
                   </button>
@@ -1000,24 +668,19 @@ The door is about to open. It always does.`);
         )}
 
         {step === 3 && (
-          <div className="p-4 sm:p-8 flex flex-col h-full lg:overflow-hidden overflow-y-auto">
-            <BackButton onClick={() => setStep(2)} className="mb-4 sm:mb-6" />
-            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6 sm:mb-8 w-full">
-               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full lg:w-auto">
-                 <h2 className="text-xl sm:text-2xl font-bold">3. Generated Content & Metadata</h2>
-                 <button onClick={saveProjectToCloud} disabled={loading} className="flex items-center justify-center gap-1.5 text-xs font-bold bg-green-50 text-green-700 px-3 py-1.5 rounded-lg border border-green-200 hover:bg-green-100 transition-colors w-full sm:w-auto">
-                   <Save size={14}/> Save Project
-                 </button>
-               </div>
-               <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+          <div className="p-8 overflow-y-auto flex flex-col h-full">
+            <BackButton onClick={() => setStep(2)} />
+            <div className="flex justify-between items-center mb-8">
+               <h2 className="text-2xl font-bold">3. Generated Content & Metadata</h2>
+               <div className="flex gap-3">
                  <button 
                   onClick={engineerPrompts} 
                   disabled={loading}
-                  className="bg-indigo-600 text-white px-6 sm:px-8 py-3 rounded-xl text-sm sm:text-base font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 transition-all active:scale-[0.98] disabled:opacity-50 relative overflow-hidden w-full sm:w-auto"
+                  className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-all active:scale-[0.98] disabled:opacity-50 relative overflow-hidden"
                  >
                    {loading && <div className="absolute left-0 top-0 bottom-0 bg-indigo-800 transition-all duration-300 z-0" style={{ width: `${genProgress}%` }} />}
                    <span className="relative z-10 flex items-center justify-center gap-2">
-                     {loading ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
+                     {loading ? <Loader2 size={18} className="animate-spin" /> : <FileText size={18} />}
                      {loading ? `Generating ${Math.round(genProgress)}%` : 'Generate Visual Prompts'}
                    </span>
                  </button>
@@ -1025,39 +688,31 @@ The door is about to open. It always does.`);
                  {imagePrompts.length > 0 && !loading && (
                    <button 
                     onClick={() => setStep(4)}
-                    className="bg-slate-900 text-white px-6 sm:px-8 py-3 rounded-xl text-sm sm:text-base font-bold flex items-center justify-center gap-2 hover:bg-black transition-all active:scale-[0.98] w-full sm:w-auto"
+                    className="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-black transition-all active:scale-[0.98]"
                    >
-                     Next: Visual Queue <ArrowLeft size={16} className="rotate-180" />
+                     Next: Visual Queue <ArrowLeft size={18} className="rotate-180" />
                    </button>
                  )}
                </div>
             </div>
             
-            <div className="grid lg:grid-cols-2 gap-6 lg:gap-8 lg:flex-1 lg:min-h-0">
-              <div className="flex flex-col min-h-[400px] lg:min-h-0 lg:h-full relative">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2 text-slate-400 uppercase font-black text-[10px] tracking-widest">
+            <div className="grid lg:grid-cols-2 gap-8 flex-1 min-h-0 overflow-hidden">
+              <div className="flex flex-col h-full">
+                <div className="flex justify-between items-center gap-2 mb-2 text-slate-400 uppercase font-black text-[10px] tracking-widest">
                   <span className="flex items-center gap-2"><FileText size={14} /> Production Script</span>
-                  <div className="flex gap-4">
-                    <a href="https://elevenlabs.io/app/home" target="_blank" rel="noopener noreferrer" className="text-indigo-500 hover:text-indigo-700 normal-case tracking-normal">Generate TTS on ElevenLabs</a>
-                    <button onClick={() => copyToClipboard(generatedScript, 'script')} className="flex items-center gap-1 text-slate-500 hover:text-slate-800 transition-colors">
-                      {copiedType === 'script' ? <CheckCircle size={14} className="text-green-500"/> : <Copy size={14}/>} Copy Script
-                    </button>
-                  </div>
+                  <a href="https://elevenlabs.io/app/home" target="_blank" rel="noopener noreferrer" className="text-indigo-500 hover:text-indigo-700 normal-case tracking-normal">Generate TTS on ElevenLabs</a>
                 </div>
-                <div className="bg-slate-50 p-4 sm:p-8 rounded-2xl sm:rounded-3xl border border-slate-100 whitespace-pre-wrap flex-1 overflow-y-auto leading-relaxed font-serif text-base sm:text-lg custom-scrollbar">
+                <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100 whitespace-pre-wrap flex-1 overflow-y-auto leading-relaxed font-serif text-lg custom-scrollbar">
                   {generatedScript}
                 </div>
               </div>
               
-              <div className="flex flex-col min-h-[500px] lg:min-h-0 lg:h-full gap-4 relative">
+              <div className="flex flex-col h-full gap-4">
                 <div className="flex flex-col flex-1 min-h-0">
-                  <div className="flex justify-between items-center gap-2 mb-2 text-slate-400 uppercase font-black text-[10px] tracking-widest shrink-0">
-                    <span className="flex items-center gap-2"><Video size={14} /> Optimized Video Description</span>
-                    <button onClick={() => copyToClipboard(generatedVideoDescription, 'desc')} className="flex items-center gap-1 text-slate-500 hover:text-slate-800 transition-colors">
-                      {copiedType === 'desc' ? <CheckCircle size={14} className="text-green-500"/> : <Copy size={14}/>} Copy Desc
-                    </button>
+                  <div className="flex items-center gap-2 mb-2 text-slate-400 uppercase font-black text-[10px] tracking-widest shrink-0">
+                    <Video size={14} /> Optimized Video Description
                   </div>
-                  <div className="bg-indigo-50/30 p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-indigo-100 whitespace-pre-wrap flex-1 overflow-y-auto leading-relaxed font-sans text-xs sm:text-sm text-slate-700 shadow-inner custom-scrollbar">
+                  <div className="bg-indigo-50/30 p-6 rounded-3xl border border-indigo-100 whitespace-pre-wrap flex-1 overflow-y-auto leading-relaxed font-sans text-sm text-slate-700 shadow-inner custom-scrollbar">
                     {generatedVideoDescription || "Analysis complete. Script generated above. Description metadata processing failed, please check source input."}
                   </div>
                 </div>
@@ -1068,13 +723,20 @@ The door is about to open. It always does.`);
                       <Tag size={14} /> SEO Tags
                     </span>
                     <button 
-                      onClick={() => copyToClipboard(generatedTags, 'tags')}
+                      onClick={() => {
+                        const ta = document.createElement('textarea');
+                        ta.value = generatedTags;
+                        document.body.appendChild(ta);
+                        ta.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(ta);
+                      }}
                       className="text-[10px] text-indigo-500 hover:text-indigo-700 font-bold flex items-center gap-1 transition-colors"
                     >
-                      {copiedType === 'tags' ? <CheckCircle size={12} className="text-green-500"/> : <Copy size={12}/>} Copy Tags
+                      <Copy size={12}/> Copy Tags
                     </button>
                   </div>
-                  <div className="bg-slate-50 p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-200 overflow-y-auto font-mono text-[10px] sm:text-xs text-slate-600 custom-scrollbar flex-1 leading-relaxed">
+                  <div className="bg-slate-50 p-6 rounded-3xl border border-slate-200 overflow-y-auto font-mono text-xs text-slate-600 custom-scrollbar flex-1 leading-relaxed">
                     {generatedTags || "Tags will appear here..."}
                   </div>
                 </div>
@@ -1084,60 +746,55 @@ The door is about to open. It always does.`);
         )}
 
         {step === 4 && (
-          <div className="p-4 sm:p-8 flex flex-col h-full lg:overflow-hidden overflow-y-auto">
-            <BackButton onClick={() => setStep(3)} className="mb-4 sm:mb-6" />
-            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6 sm:mb-8 shrink-0 w-full">
-              <h2 className="text-xl sm:text-2xl font-bold">4. Visual Prompt Queue ({imagePrompts.length} Prompts)</h2>
-              <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+          <div className="p-8 flex flex-col h-full min-h-0">
+            <BackButton onClick={() => setStep(3)} />
+            <div className="flex justify-between items-center mb-8 shrink-0">
+              <h2 className="text-2xl font-bold">4. Visual Prompt Queue ({imagePrompts.length} Prompts)</h2>
+              <div className="flex gap-3">
                 <button 
                   onClick={engineerPrompts} 
                   disabled={loading}
-                  className="bg-slate-100 text-slate-700 px-6 py-3 rounded-xl text-sm font-bold hover:bg-slate-200 transition-colors shadow-sm active:scale-95 flex items-center justify-center gap-2 w-full sm:w-auto"
+                  className="bg-slate-100 text-slate-700 px-6 py-3 rounded-xl text-sm font-bold hover:bg-slate-200 transition-colors shadow-sm active:scale-95 flex items-center gap-2"
                 >
-                  {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+                  {loading ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />}
                   Regenerate Prompts
                 </button>
-                <button onClick={() => setStep(5)} className="bg-indigo-600 text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors shadow-lg active:scale-95 flex items-center justify-center gap-2 w-full sm:w-auto">
-                  Open Image Studio <Sparkles size={16} />
+                <button onClick={() => setStep(5)} className="bg-indigo-600 text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors shadow-lg active:scale-95 flex items-center gap-2">
+                  Open Image Studio <Sparkles size={18} />
                 </button>
               </div>
             </div>
             
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 lg:flex-1 lg:min-h-0">
-              <div className="lg:col-span-4 flex flex-col min-h-[300px] lg:min-h-0 lg:h-full bg-slate-50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-slate-200 relative">
-                <div className="flex justify-between items-center mb-4 shrink-0">
-                  <h3 className="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <FileText size={14} /> Full Production Script
-                  </h3>
-                  <button onClick={() => copyToClipboard(generatedScript, 'script4')} className="text-[10px] text-indigo-500 hover:text-indigo-700 font-bold flex items-center gap-1 transition-colors">
-                     {copiedType === 'script4' ? <CheckCircle size={12} className="text-green-500"/> : <Copy size={12}/>} Copy
-                  </button>
-                </div>
-                <div className="flex-1 overflow-y-auto pr-2 font-serif text-xs sm:text-sm leading-relaxed text-slate-700 whitespace-pre-wrap pb-8 custom-scrollbar">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 flex-1 min-h-0 overflow-hidden">
+              <div className="lg:col-span-4 flex flex-col h-full bg-slate-50 rounded-3xl p-6 border border-slate-200">
+                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2 shrink-0">
+                  <FileText size={14} /> Full Production Script
+                </h3>
+                <div className="flex-1 overflow-y-auto pr-2 font-serif text-sm leading-relaxed text-slate-700 whitespace-pre-wrap pb-8 custom-scrollbar">
                   {generatedScript}
                 </div>
               </div>
 
-              <div className="lg:col-span-8 overflow-y-auto pr-2 lg:pr-4 space-y-4 sm:space-y-6 pb-10 sm:pb-20 custom-scrollbar min-h-[500px] lg:min-h-0 lg:h-full">
+              <div className="lg:col-span-8 overflow-y-auto pr-4 space-y-6 pb-20 custom-scrollbar">
                 {imagePrompts.map((scene, i) => (
-                  <div key={i} className={`p-4 sm:p-6 rounded-2xl border relative group transition-colors ${scene.isThumbnail ? 'bg-amber-50/40 border-amber-300 hover:border-amber-400' : 'bg-slate-50 border-slate-200 hover:border-indigo-300'}`}>
-                    <button onClick={() => copyToClipboard(scene.prompt, `prompt-${i}`)} className="absolute top-4 right-4 p-2 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-indigo-50 hover:text-indigo-600 transition-colors z-20">
-                      {copiedType === `prompt-${i}` ? <CheckCircle size={16} className="text-green-600" /> : <Copy size={16} />}
+                  <div key={i} className={`p-6 rounded-2xl border relative group transition-colors ${scene.isThumbnail ? 'bg-amber-50/40 border-amber-300 hover:border-amber-400' : 'bg-slate-50 border-slate-200 hover:border-indigo-300'}`}>
+                    <button onClick={() => copyPrompt(scene.prompt, i)} className="absolute top-4 right-4 p-2 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-indigo-50 hover:text-indigo-600 transition-colors z-20">
+                      {copiedIndex === i ? <CheckCircle size={16} className="text-green-600" /> : <Copy size={16} />}
                     </button>
                     
-                    <p className={`text-[10px] sm:text-xs font-bold mb-4 uppercase tracking-widest flex items-center gap-2 ${scene.isThumbnail ? 'text-amber-600' : 'text-indigo-600'}`}>
+                    <p className={`text-xs font-bold mb-4 uppercase tracking-widest flex items-center gap-2 ${scene.isThumbnail ? 'text-amber-600' : 'text-indigo-600'}`}>
                       {scene.isThumbnail ? <><Play size={16}/> YouTube Thumbnail Design</> : `Scene ${i+1}`}
                     </p>
                     
                     <div className="grid grid-cols-1 gap-4">
                       {scene.script && !scene.isThumbnail && (
-                        <div className="bg-white p-3 sm:p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col">
+                        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col">
                            <span className="text-[10px] font-black uppercase text-slate-400 block mb-2 border-b border-slate-50 pb-1">Audio Script Match</span>
-                           <span className="text-sm sm:text-base text-slate-800 font-serif leading-relaxed line-clamp-none whitespace-pre-wrap italic">"{scene.script}"</span>
+                           <span className="text-base text-slate-800 font-serif leading-relaxed line-clamp-none whitespace-pre-wrap italic">"{scene.script}"</span>
                         </div>
                       )}
                       
-                      <div className={`text-xs sm:text-sm text-slate-700 leading-relaxed whitespace-pre-wrap font-mono p-3 sm:p-4 rounded-xl border ${scene.isThumbnail ? 'bg-amber-100/30 border-amber-200/50' : 'bg-indigo-50/50 border-indigo-100/50'}`}>
+                      <div className={`text-sm text-slate-700 leading-relaxed whitespace-pre-wrap font-mono p-4 rounded-xl border ${scene.isThumbnail ? 'bg-amber-100/30 border-amber-200/50' : 'bg-indigo-50/50 border-indigo-100/50'}`}>
                         {scene.prompt}
                       </div>
                     </div>
@@ -1149,32 +806,23 @@ The door is about to open. It always does.`);
         )}
 
         {step === 5 && (
-          <div className="p-4 sm:p-8 flex flex-col h-full lg:overflow-hidden overflow-y-auto">
-            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6 sm:mb-8 shrink-0 w-full">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full lg:w-auto">
+          <div className="p-8 flex flex-col h-full min-h-0">
+            <div className="flex justify-between items-center mb-8 shrink-0">
+              <div className="flex items-center gap-4">
                 <BackButton onClick={() => setStep(4)} />
-                <h2 className="text-xl sm:text-2xl font-bold">5. Image Production Studio</h2>
+                <h2 className="text-2xl font-bold">5. Image Production Studio</h2>
               </div>
-              <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
-                <button 
-                  onClick={downloadAllImages}
-                  className="bg-slate-100 text-slate-700 px-6 py-3 rounded-xl text-sm sm:text-base font-bold flex items-center justify-center gap-2 hover:bg-slate-200 transition-all active:scale-[0.98] w-full sm:w-auto"
-                >
-                  <Download size={16} />
-                  Download All Ready
-                </button>
-                <button 
-                  onClick={generateAllImages} 
-                  disabled={batchGenLoading}
-                  className="bg-indigo-600 text-white px-6 sm:px-8 py-3 rounded-xl text-sm sm:text-base font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 transition-all active:scale-[0.98] disabled:opacity-50 w-full sm:w-auto"
-                >
-                  {batchGenLoading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-                  {batchGenLoading ? 'Generating Batch...' : 'Generate All Images'}
-                </button>
-              </div>
+              <button 
+                onClick={generateAllImages} 
+                disabled={batchGenLoading}
+                className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-all active:scale-[0.98] disabled:opacity-50"
+              >
+                {batchGenLoading ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
+                {batchGenLoading ? 'Generating Batch...' : 'Generate All Images'}
+              </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 flex-1 lg:min-h-0 lg:overflow-y-auto pr-1 sm:pr-4 pb-12 custom-scrollbar">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 flex-1 min-h-0 overflow-y-auto pr-4 pb-12 custom-scrollbar">
               {imagePrompts.map((scene, i) => (
                 <div key={i} className={`rounded-2xl border overflow-hidden flex flex-col shadow-sm h-fit ${scene.isThumbnail ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}`}>
                   <div className="aspect-video bg-slate-200 relative flex items-center justify-center border-b border-slate-200 overflow-hidden">
@@ -1183,9 +831,9 @@ The door is about to open. It always does.`);
                     ) : (
                       <div className="flex flex-col items-center gap-2 text-slate-400">
                         {imageLoadingStates[i] ? (
-                          <Loader2 size={24} className={`animate-spin ${scene.isThumbnail ? 'text-amber-500' : 'text-indigo-500'}`} />
+                          <Loader2 size={32} className={`animate-spin ${scene.isThumbnail ? 'text-amber-500' : 'text-indigo-500'}`} />
                         ) : (
-                          scene.isThumbnail ? <Play size={24} /> : <ImageIcon size={24} />
+                          scene.isThumbnail ? <Play size={32} /> : <ImageIcon size={32} />
                         )}
                         <span className="text-[10px] font-bold uppercase tracking-widest">
                           {imageLoadingStates[i] ? 'Drawing Scene...' : 'Ready to Render'}
@@ -1194,9 +842,9 @@ The door is about to open. It always does.`);
                     )}
                   </div>
                   
-                  <div className="p-3 sm:p-4 flex-1 flex flex-col">
+                  <div className="p-4 flex-1 flex flex-col">
                     <div className="flex justify-between items-center mb-2">
-                      <span className={`text-[10px] sm:text-xs font-black uppercase tracking-widest flex items-center gap-1.5 ${scene.isThumbnail ? 'text-amber-600' : 'text-indigo-600'}`}>
+                      <span className={`text-xs font-black uppercase tracking-widest flex items-center gap-1.5 ${scene.isThumbnail ? 'text-amber-600' : 'text-indigo-600'}`}>
                         {scene.isThumbnail ? <Star size={12}/> : ''} 
                         {scene.isThumbnail ? 'Thumbnail' : `Scene ${i+1}`}
                       </span>
@@ -1237,71 +885,6 @@ The door is about to open. It always does.`);
           </div>
         )}
       </main>
-
-      {/* --- Projects Modal --- */}
-      {showProjectsModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl sm:rounded-3xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh] sm:max-h-[80vh]">
-            <div className="p-4 sm:p-6 border-b border-slate-100 flex justify-between items-center">
-              <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2"><FolderOpen size={20}/> My Cloud Projects</h2>
-              <button onClick={() => setShowProjectsModal(false)} className="text-slate-400 hover:text-slate-800"><X size={20}/></button>
-            </div>
-            <div className="p-4 sm:p-6 overflow-y-auto flex-1 custom-scrollbar space-y-4">
-              {savedProjects.length === 0 ? (
-                <div className="text-center text-slate-400 py-10">
-                  <FolderOpen size={48} className="mx-auto mb-4 opacity-20"/>
-                  <p>No saved projects found in the cloud.</p>
-                </div>
-              ) : (
-                savedProjects.map(proj => (
-                  <div key={proj.id} className="border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:border-indigo-300 transition-colors">
-                    <div>
-                      <h3 className="font-bold text-slate-800 text-base sm:text-lg">{proj.videoTitle || 'Untitled Project'}</h3>
-                      <p className="text-[10px] sm:text-xs text-slate-400 font-mono mt-1">Saved: {new Date(proj.updatedAt).toLocaleString()}</p>
-                    </div>
-                    <div className="flex gap-2 w-full sm:w-auto">
-                      <button onClick={() => loadProject(proj)} className="flex-1 sm:flex-none px-4 py-2 bg-indigo-50 text-indigo-700 font-bold rounded-xl text-sm hover:bg-indigo-100 transition-colors">Load</button>
-                      <button onClick={() => deleteProject(proj.id)} className="p-2 text-red-400 hover:bg-red-50 hover:text-red-600 rounded-xl transition-colors"><Trash2 size={16}/></button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* --- Settings Modal --- */}
-      {showSettingsModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl sm:rounded-3xl w-full max-w-md shadow-2xl flex flex-col overflow-hidden max-h-[90vh]">
-            <div className="p-4 sm:p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
-              <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2 text-slate-800"><Settings size={20}/> App Settings</h2>
-              <button onClick={() => setShowSettingsModal(false)} className="text-slate-400 hover:text-slate-800"><X size={20}/></button>
-            </div>
-            <div className="p-6 sm:p-8 space-y-6 overflow-y-auto custom-scrollbar flex-1">
-              <div className="space-y-3">
-                <label className="flex items-center gap-2 text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">
-                  <Key size={14}/> Google Gemini API Key
-                </label>
-                <input 
-                  type="password" 
-                  value={customApiKey} 
-                  onChange={(e) => setCustomApiKey(e.target.value)} 
-                  placeholder="Paste your AI Studio API key here..." 
-                  className="w-full bg-slate-50 p-3 sm:p-4 rounded-xl border border-slate-200 shadow-inner outline-none focus:border-indigo-400 font-mono text-xs sm:text-sm"
-                />
-                <p className="text-[10px] text-slate-400 leading-relaxed">
-                  <strong>Deploying to GitHub Pages?</strong> Leave the API key blank in your source code! Provide your API key here at runtime. It is safely used locally in your browser to process requests without exposing it to public repositories.
-                </p>
-              </div>
-            </div>
-            <div className="p-4 sm:p-6 border-t border-slate-100 bg-slate-50 flex justify-end shrink-0">
-              <button onClick={() => setShowSettingsModal(false)} className="w-full sm:w-auto px-6 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors">Save & Close</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <style dangerouslySetInnerHTML={{ __html: `
         .custom-scrollbar::-webkit-scrollbar {

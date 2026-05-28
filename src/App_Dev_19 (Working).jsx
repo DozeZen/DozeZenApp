@@ -212,68 +212,6 @@ The door is about to open. It always does.`);
   const [imageLoadingStates, setImageLoadingStates] = useState({});
   const [batchGenLoading, setBatchGenLoading] = useState(false);
 
-  // --- Auto-Load Reference Image from public folder ---
-  useEffect(() => {
-    const img = new Image();
-    img.crossOrigin = "Anonymous";
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const targetRatio = 16 / 9;
-      const imgRatio = img.width / img.height;
-
-      let canvasWidth = img.width;
-      let canvasHeight = img.height;
-
-      if (imgRatio < targetRatio) {
-        canvasWidth = img.height * targetRatio;
-      } else {
-        canvasHeight = img.width / targetRatio;
-      }
-
-      // Cap the resolution to keep Base64 small enough for Firestore saving
-      const MAX_WIDTH = 800;
-      if (canvasWidth > MAX_WIDTH) {
-         canvasHeight = Math.round(MAX_WIDTH / targetRatio);
-         canvasWidth = MAX_WIDTH;
-      }
-
-      canvas.width = canvasWidth;
-      canvas.height = canvasHeight;
-      const ctx = canvas.getContext('2d');
-      
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-      
-      // Draw image centered and scaled down if needed
-      let drawWidth = img.width;
-      let drawHeight = img.height;
-      if (imgRatio < targetRatio && drawHeight > canvasHeight) {
-          drawHeight = canvasHeight;
-          drawWidth = drawHeight * imgRatio;
-      } else if (imgRatio >= targetRatio && drawWidth > canvasWidth) {
-          drawWidth = canvasWidth;
-          drawHeight = drawWidth / imgRatio;
-      }
-
-      const x = (canvasWidth - drawWidth) / 2;
-      const y = (canvasHeight - drawHeight) / 2;
-      ctx.drawImage(img, x, y, drawWidth, drawHeight);
-
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-      const base64String = dataUrl.split(',')[1];
-      
-      setCharacterImageBase64({
-        mimeType: 'image/jpeg',
-        data: base64String,
-        previewUrl: dataUrl
-      });
-    };
-    img.onerror = () => {
-      console.warn("Could not auto-load /reference.png. Please ensure the file is in your public directory or upload manually.");
-    };
-    img.src = '/reference.png';
-  }, []);
-
   // --- Firebase Auth & Projects Fetching ---
   useEffect(() => {
     if (!auth) return;
