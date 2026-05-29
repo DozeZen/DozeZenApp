@@ -48,7 +48,7 @@ try {
   // 2. Hardcoded Config
   else {
     configObj = {
-      apiKey: ["AIzaSy", "Bd3RJNXltu_CxRt", "jiU25pk_S0oItzUbBU"].join(""),
+      apiKey: "AIzaSyBd3RJNXltu_CxRtjiU25pk_S0oItzUbBU",
       authDomain: "dozezen-3faf3.firebaseapp.com",
       projectId: "dozezen-3faf3",
       storageBucket: "dozezen-3faf3.firebasestorage.app",
@@ -66,49 +66,6 @@ try {
 } catch (e) {
   console.error("Firebase init failed. Please check your config.", e);
 }
-
-// --- SEO Helper Component ---
-const SeoIndicator = ({ type, text }) => {
-  const len = (text || "").length;
-  let color = "text-slate-400";
-  let bgClass = "bg-slate-400";
-  let message = "";
-  let score = 0; // 0 to 100
-
-  if (type === "title") {
-     if (len === 0) { 
-       color = "text-slate-400"; bgClass = "bg-slate-400"; message = "0/70"; score = 0; 
-     } else if (len < 40) { 
-       color = "text-amber-500"; bgClass = "bg-amber-500"; message = `${len}/70 - Too short for SEO`; score = 50; 
-     } else if (len <= 70) { 
-       color = "text-green-500"; bgClass = "bg-green-500"; message = `${len}/70 - Optimal length`; score = 100; 
-     } else { 
-       color = "text-red-500"; bgClass = "bg-red-500"; message = `${len}/70 - Too long, will truncate`; score = 30;
-     }
-  } else if (type === "description") {
-     if (len === 0) { 
-       color = "text-slate-400"; bgClass = "bg-slate-400"; message = "0/5000"; score = 0; 
-     } else if (len < 200) { 
-       color = "text-amber-500"; bgClass = "bg-amber-500"; message = `${len} chars - Needs more detail`; score = 40;
-     } else {
-        const hasHashtags = (text || "").includes('#');
-        if (hasHashtags) { 
-          color = "text-green-500"; bgClass = "bg-green-500"; message = `${len} chars - Excellent SEO & Hashtags`; score = 100;
-        } else { 
-          color = "text-blue-500"; bgClass = "bg-blue-500"; message = `${len} chars - Good length (Add #tags)`; score = 80;
-        }
-     }
-  }
-
-  return (
-    <div className="flex items-center gap-3 mt-1.5 mb-3 w-full">
-       <div className="flex-1 bg-slate-200 h-1.5 rounded-full overflow-hidden max-w-[150px] sm:max-w-[200px]">
-          <div className={`h-full ${bgClass} transition-all duration-300 ease-out`} style={{ width: `${Math.max(5, score)}%`}}></div>
-       </div>
-       <span className={`text-[10px] sm:text-xs font-bold ${color}`}>{message}</span>
-    </div>
-  );
-};
 
 const App = () => {
   const [step, setStep] = useState(1);
@@ -219,7 +176,7 @@ board seats, security protocols, a communications manager who reviews everything
 
 unselfconsciously, the way you sing when there's no audience. You realize sitting there that you cannot remember the last time you did anything without an audience, without calculating the signal of it,  the cost of it, the way it would read to someone watching. Every conversation is a positioning exercise. Every dinner is a relationship maintenance decision. Every minute is a resource allocation. Your sister is singing badly to a song from 2007. You look out the window at the flat
 
-Indiana landscape, gray November sky, strip malls, the specific Midwestern emptiness that used to feel like a ceiling and now feels like something you cannot name. Something in your chest moves, not breaks. Moves, like furniture shifted an inch. You don't splits along. You've forgotten the words. That's the part that stays with you. They install a professional CEO 14 months after the acquisition. Technically, you agreed to it. You signed the paperwork. But the acquiring company made clear, in
+Indiana landscape, gray November sky, strip malls, the specific Midwestern emptiness that used to feel like a ceiling and now feels like something you cannot name. Something in your chest moves, not breaks. Moves, like furniture shifted an inch. You don't sing along. You've forgotten the words. That's the part that stays with you. They install a professional CEO 14 months after the acquisition. Technically, you agreed to it. You signed the paperwork. But the acquiring company made clear, in
 
 the polite way that power makes things clear, that a founder running a nearly $3 billion integration is a risk profile they weren't underwriting.  You become chief strategy officer. The title means, we will put you in front of investors and you will make  the business sound inevitable. You watch the product get remade. Features deprecated for portfolio alignment, pricing restructured in ways that punish the mid-market customers you built the thing for. The culture
 
@@ -588,22 +545,14 @@ The door is about to open. It always does.`);
   const generateTrendingTopic = async () => {
     setTopicLoading(true);
     try {
-      // Improved variety for topic generation
-      const niches = [
-        'History', 'Anthropology', 'Human Evolution',
-        'Psychology of Wealth', 'Tech History',
-        'Forgotten Mysteries', 'True Crime Economics',
-        'Ancient Civilizations', 'Future Predictions',
-        'Bizarre Science', 'Lost Empires'
-      ];
-      const randomNiche = niches[Math.floor(Math.random() * niches.length)];
-      
-      const prompt = `Act as an expert YouTube strategist. Research current viral trends in the '${randomNiche}' niche. Generate exactly ONE highly engaging, click-optimized YouTube video title that has high viral potential right now. To ensure variety, explore a unique, unexpected, or counter-intuitive angle (Random Seed: ${Math.random()}). Return ONLY the title text, nothing else. Do not use quotes.`;
+      const prompt = "Act as an expert YouTube strategist. Research current viral trends in the 'History', 'Anthropology', and 'Human Evolution' niches. Generate exactly ONE highly engaging, click-optimized YouTube video title that has high viral potential right now. Return ONLY the title text, nothing else. Do not use quotes.";
       
       let freshTitle;
       try {
+        // Try with Search enabled first (if your API tier supports it)
         freshTitle = await callGemini(prompt, "", true); 
       } catch (searchError) {
+        // Fallback: If Search is blocked (400 error), use the model's internal brain
         console.warn("Search tool unavailable, using internal model knowledge instead.");
         freshTitle = await callGemini(prompt, "", false); 
       }
@@ -704,9 +653,9 @@ The door is about to open. It always does.`);
     setLoading(true);
     startProgress();
     
-    // Dynamic Scene Calculation: 10 images per 130 words, minimum 80.
+    // Dynamic Scene Calculation: 12 images per 130 words, minimum 80.
     const wordCount = generatedScript.trim().split(/\s+/).length;
-    const targetSceneCount = Math.max(80, Math.ceil((wordCount / 130) * 10));
+    const targetSceneCount = Math.max(80, Math.ceil((wordCount / 130) * 12));
     const totalPrompts = targetSceneCount + 1; // +1 for the Thumbnail
     
     try {
@@ -926,14 +875,6 @@ The door is about to open. It always does.`);
         
         <div className="flex items-center gap-2 sm:gap-4">
           <button 
-            onClick={saveProjectToCloud}
-            disabled={loading}
-            className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-bold text-green-700 bg-green-50 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl border border-green-200 hover:bg-green-100 transition-colors shadow-sm disabled:opacity-50"
-          >
-            {loading ? <Loader2 size={16} className="animate-spin w-4 h-4 sm:w-5 sm:h-5" /> : <Save size={16} className="w-4 h-4 sm:w-5 sm:h-5" />}
-            <span className="hidden sm:inline">Save Project</span><span className="sm:hidden">Save</span>
-          </button>
-          <button 
             onClick={() => setShowProjectsModal(true)}
             className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-bold text-slate-600 bg-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl border border-slate-200 hover:bg-indigo-50 hover:text-indigo-600 transition-colors shadow-sm"
           >
@@ -967,10 +908,9 @@ The door is about to open. It always does.`);
                       {topicLoading ? 'Researching...' : 'AI Research Topic'}
                     </button>
                   </div>
-                  <input type="text" value={videoTitle} onChange={(e) => setVideoTitle(e.target.value)} className="w-full bg-white p-3 rounded-xl border border-slate-200 shadow-sm outline-none mb-1 text-xs sm:text-sm font-semibold text-slate-800" />
-                  <SeoIndicator type="title" text={videoTitle} />
+                  <input type="text" value={videoTitle} onChange={(e) => setVideoTitle(e.target.value)} className="w-full bg-white p-3 rounded-xl border border-slate-200 shadow-sm outline-none mb-4 text-xs sm:text-sm font-semibold text-slate-800" />
                   
-                  <label className="block text-[10px] font-black text-slate-400 mb-1 mt-3 uppercase">Additional Instructions</label>
+                  <label className="block text-[10px] font-black text-slate-400 mb-1 uppercase">Additional Instructions</label>
                   <textarea value={additionalDetails} onChange={(e) => setAdditionalDetails(e.target.value)} className="w-full bg-white p-3 rounded-xl border border-slate-200 shadow-sm outline-none h-32 resize-none text-xs sm:text-sm" />
                 </div>
               </div>
@@ -1065,6 +1005,9 @@ The door is about to open. It always does.`);
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6 sm:mb-8 w-full">
                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full lg:w-auto">
                  <h2 className="text-xl sm:text-2xl font-bold">3. Generated Content & Metadata</h2>
+                 <button onClick={saveProjectToCloud} disabled={loading} className="flex items-center justify-center gap-1.5 text-xs font-bold bg-green-50 text-green-700 px-3 py-1.5 rounded-lg border border-green-200 hover:bg-green-100 transition-colors w-full sm:w-auto">
+                   <Save size={14}/> Save Project
+                 </button>
                </div>
                <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
                  <button 
@@ -1108,13 +1051,12 @@ The door is about to open. It always does.`);
               
               <div className="flex flex-col min-h-[500px] lg:min-h-0 lg:h-full gap-4 relative">
                 <div className="flex flex-col flex-1 min-h-0">
-                  <div className="flex justify-between items-center gap-2 mb-1 text-slate-400 uppercase font-black text-[10px] tracking-widest shrink-0">
+                  <div className="flex justify-between items-center gap-2 mb-2 text-slate-400 uppercase font-black text-[10px] tracking-widest shrink-0">
                     <span className="flex items-center gap-2"><Video size={14} /> Optimized Video Description</span>
                     <button onClick={() => copyToClipboard(generatedVideoDescription, 'desc')} className="flex items-center gap-1 text-slate-500 hover:text-slate-800 transition-colors">
                       {copiedType === 'desc' ? <CheckCircle size={14} className="text-green-500"/> : <Copy size={14}/>} Copy Desc
                     </button>
                   </div>
-                  <SeoIndicator type="description" text={generatedVideoDescription} />
                   <div className="bg-indigo-50/30 p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-indigo-100 whitespace-pre-wrap flex-1 overflow-y-auto leading-relaxed font-sans text-xs sm:text-sm text-slate-700 shadow-inner custom-scrollbar">
                     {generatedVideoDescription || "Analysis complete. Script generated above. Description metadata processing failed, please check source input."}
                   </div>

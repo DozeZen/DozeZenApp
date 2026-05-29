@@ -48,7 +48,7 @@ try {
   // 2. Hardcoded Config
   else {
     configObj = {
-      apiKey: ["AIzaSy", "Bd3RJNXltu_CxRt", "jiU25pk_S0oItzUbBU"].join(""),
+      apiKey: "AIzaSyBd3RJNXltu_CxRtjiU25pk_S0oItzUbBU",
       authDomain: "dozezen-3faf3.firebaseapp.com",
       projectId: "dozezen-3faf3",
       storageBucket: "dozezen-3faf3.firebasestorage.app",
