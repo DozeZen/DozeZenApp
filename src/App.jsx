@@ -314,7 +314,7 @@ The door is about to open. It always does.`);
     img.onerror = () => {
       console.warn("Could not auto-load /reference.png. Please ensure the file is in your public directory or upload manually.");
     };
-    img.src = '/reference.png';
+    img.src = './reference.png';
   }, []);
 
   // --- Firebase Auth & Projects Fetching ---
