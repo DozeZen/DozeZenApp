@@ -704,9 +704,9 @@ The door is about to open. It always does.`);
     setLoading(true);
     startProgress();
     
-    // Dynamic Scene Calculation: 14 images per 130 words, minimum 80.
+    // Dynamic Scene Calculation: 10 images per 100 words, minimum 80.
     const wordCount = generatedScript.trim().split(/\s+/).length;
-    const targetSceneCount = Math.max(80, Math.ceil((wordCount / 130) * 14));
+    const targetSceneCount = Math.max(80, Math.ceil((wordCount / 100) * 10));
     const totalPrompts = targetSceneCount + 1; // +1 for the Thumbnail
     
     try {
