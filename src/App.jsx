@@ -33,7 +33,7 @@ import { getFirestore, doc, setDoc, collection, onSnapshot, deleteDoc, serverTim
 const apiKey = ""; // Leave empty for Canvas environment proxy to work!
 const TEXT_MODEL = "gemini-3.1-pro-preview"; 
 const IMAGE_GEN_MODEL = "imagen-4.0-generate-001"; 
-const IMAGE_REF_MODEL = "gemini-3.1-flash-image-preview";
+const IMAGE_REF_MODEL = "gemini-2.5-flash-image";
 
 // --- Firebase Initialization ---
 let app, auth, db;
@@ -514,7 +514,7 @@ The door is about to open. It always does.`);
     
     // Use public models if a custom API key is provided, otherwise use Canvas preview models
     if (activeKey) {
-        modelToUse = isImageToImage ? "gemini-3.1-flash-image-preview" : "imagen-4.0-generate-001";
+        modelToUse = isImageToImage ? "gemini-2.5-flash-image" : "imagen-4.0-generate-001";
     }
     
     while (retries <= maxRetries) {
